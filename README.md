@@ -312,9 +312,11 @@ curl -X GET http://localhost:8000/mcp -H "Accept: text/event-stream"
 - Ensure the MCP server is running and accessible at the configured URL
 - Verify MCPO can reach the MCP server (check Docker network settings)
 - Confirm the URL includes `/mcp` endpoint: `http://localhost:8000/mcp`
+- The server accepts both `/mcp` and `/mcp/` (with or without trailing slash) without redirecting
 - Check MCPO logs: `docker logs mcpo`
 - For remote servers, ensure firewall rules allow connections
 - Verify the `type` is set to `"streamable-http"` in MCPO config
+- If using older versions of MCPO (< 0.0.18), ensure it's updated to avoid trailing slash issues
 
 ## Command-Line Options
 

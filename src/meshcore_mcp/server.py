@@ -300,6 +300,21 @@ def main():
     # Get the Starlette app for streamable HTTP transport
     app = mcp.streamable_http_app()
 
+    # Add middleware to handle trailing slash without redirecting
+    # MCPO may append trailing slashes which causes 307 redirects by default
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.requests import Request
+
+    class TrailingSlashMiddleware(BaseHTTPMiddleware):
+        """Normalize trailing slashes to avoid 307 redirects."""
+        async def dispatch(self, request: Request, call_next):
+            # If path ends with /, remove it before processing
+            if request.url.path.endswith("/") and request.url.path != "/":
+                request.scope["path"] = request.url.path.rstrip("/")
+            return await call_next(request)
+
+    app.add_middleware(TrailingSlashMiddleware)
+
     # Run with uvicorn to support custom host and port
     import uvicorn
     uvicorn.run(app, host=args.host, port=args.port)
