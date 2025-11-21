@@ -495,7 +495,7 @@ async def meshcore_start_message_listening() -> str:
 
         # Start auto message fetching
         print(f"[DEBUG] Starting auto message fetching", file=sys.stderr)
-        state.meshcore.start_auto_message_fetching()
+        await state.meshcore.start_auto_message_fetching()
         print(f"[DEBUG] Auto message fetching started", file=sys.stderr)
 
         state.is_listening = True
@@ -534,7 +534,7 @@ async def meshcore_stop_message_listening() -> str:
         # Stop auto message fetching
         if state.meshcore and state.meshcore.is_connected:
             print(f"[DEBUG] Stopping auto message fetching", file=sys.stderr)
-            state.meshcore.stop_auto_message_fetching()
+            await state.meshcore.stop_auto_message_fetching()
             print(f"[DEBUG] Auto message fetching stopped", file=sys.stderr)
 
         # Clean up subscriptions
