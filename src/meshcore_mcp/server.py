@@ -94,7 +94,7 @@ mcp = FastMCP("meshcore-mcp")
 @mcp.tool()
 async def meshcore_connect(
     type: str,
-    port: Optional[str] = None,
+    port: Optional[str] = "/dev/ttyUSB0",
     baud_rate: int = 115200,
     address: Optional[str] = None,
     host: Optional[str] = None,
@@ -106,13 +106,13 @@ async def meshcore_connect(
     Connect to a MeshCore device.
 
     Supports three connection types:
-    - 'serial': requires port, optional baud_rate (default: 115200)
+    - 'serial': uses port (default: /dev/ttyUSB0), optional baud_rate (default: 115200)
     - 'ble': requires address (MAC), optional pin for pairing
     - 'tcp': requires host and port, optional auto_reconnect
 
     Args:
         type: Connection type ('serial', 'ble', or 'tcp')
-        port: Serial port path (for serial) or TCP port number (for tcp)
+        port: Serial port path (for serial, default: /dev/ttyUSB0) or TCP port number (for tcp)
         baud_rate: Baud rate for serial connection (default: 115200)
         address: BLE MAC address (for ble) or TCP host (for tcp)
         host: TCP host/IP address (for tcp)
@@ -129,9 +129,6 @@ async def meshcore_connect(
 
     try:
         if type == "serial":
-            if not port:
-                return "Error: 'port' required for serial connection"
-
             state.meshcore = await MeshCore.create_serial(port, baud_rate, debug=debug)
             state.connection_type = "serial"
             state.connection_params = {"port": port, "baud_rate": baud_rate}
@@ -210,29 +207,58 @@ async def meshcore_disconnect() -> str:
 
 
 @mcp.tool()
-async def meshcore_send_message(destination: str, text: str) -> str:
+async def meshcore_send_message(
+    text: str,
+    destination: Optional[str] = None,
+    channel: Optional[int] = None
+) -> str:
     """
-    Send a text message to a contact.
+    Send a text message to a contact or public channel.
+
+    You must specify either 'destination' (for individual messages) or 'channel' (for channel messages),
+    but not both.
 
     Args:
-        destination: Contact name or public key prefix
         text: Message text to send
+        destination: Contact name or public key prefix (for individual messages)
+        channel: Channel number (for channel/broadcast messages, typically 0-7)
 
     Returns:
         Send status message with result
+
+    Examples:
+        - Send to individual: destination="Alice", channel=None
+        - Send to channel: destination=None, channel=0
     """
     # Ensure connected (auto-reconnect if needed)
     error = await ensure_connected()
     if error:
         return error
 
+    # Validate parameters
+    if destination and channel is not None:
+        return "Error: Specify either 'destination' or 'channel', not both"
+
+    if not destination and channel is None:
+        return "Error: Must specify either 'destination' or 'channel'"
+
     try:
-        result = await state.meshcore.commands.send_msg(destination, text)
+        # Determine the target
+        if channel is not None:
+            # Send to channel - use channel number as destination
+            target = str(channel)
+            msg_type = f"channel {channel}"
+        else:
+            # Send to individual contact
+            target = destination
+            msg_type = f"contact {destination}"
+
+        result = await state.meshcore.commands.send_msg(target, text)
 
         if result.type == EventType.ERROR:
             return f"Send failed: {result.payload}"
 
-        return f"Message sent to {destination}: \"{text}\"\nResult: {result.type.name}"
+        return f"Message sent to {msg_type}: \"{text}\"\nResult: {result.type.name}"
 
     except Exception as e:
         return f"Send message failed: {str(e)}"
