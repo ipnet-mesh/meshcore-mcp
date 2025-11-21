@@ -54,15 +54,26 @@ python -m meshcore_mcp.server
 python -m meshcore_mcp.server --host 0.0.0.0 --port 3000
 ```
 
+**With auto-connect to serial device (recommended):**
+```bash
+python -m meshcore_mcp.server --serial-port /dev/ttyUSB0 --baud-rate 115200
+```
+
+This will connect to the device on startup and fail-fast if the connection fails. Debug mode can be enabled with `--debug`.
+
 **As an installed command:**
 ```bash
-meshcore-mcp --host 0.0.0.0 --port 8080
+meshcore-mcp --serial-port /dev/ttyUSB0 --debug
 ```
 
 The server will print:
 ```
 Starting MeshCore MCP Server on 0.0.0.0:8000
 Server URL: http://0.0.0.0:8000
+[STARTUP] Auto-connect enabled for /dev/ttyUSB0
+[STARTUP] Attempting to connect to /dev/ttyUSB0 at 115200 baud...
+[STARTUP] Successfully connected to MeshCore device on /dev/ttyUSB0
+[STARTUP] Device connected. Starting HTTP server...
 ```
 
 ### With Claude Desktop
@@ -386,14 +397,22 @@ curl -X GET http://localhost:8000/mcp -H "Accept: text/event-stream"
 ## Command-Line Options
 
 ```
-usage: server.py [-h] [--host HOST] [--port PORT]
+usage: server.py [-h] [--host HOST] [--port PORT] [--serial-port SERIAL_PORT]
+                 [--baud-rate BAUD_RATE] [--debug]
 
 MeshCore MCP Server - HTTP/Streamable transport
 
 options:
-  -h, --help   show this help message and exit
-  --host HOST  Host to bind to (default: 0.0.0.0)
-  --port PORT  Port to bind to (default: 8000)
+  -h, --help            show this help message and exit
+  --host HOST           Host to bind to (default: 0.0.0.0)
+  --port PORT           Port to bind to (default: 8000)
+  --serial-port SERIAL_PORT
+                        Serial port to auto-connect on startup (e.g.,
+                        /dev/ttyUSB0). If specified, server will fail-fast if
+                        connection fails.
+  --baud-rate BAUD_RATE
+                        Baud rate for serial connection (default: 115200)
+  --debug               Enable debug mode for MeshCore connection
 ```
 
 ## Dependencies

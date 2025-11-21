@@ -673,6 +673,37 @@ async def meshcore_clear_messages() -> str:
     return f"Cleared {count} message(s) from buffer"
 
 
+async def startup_connect(serial_port: str, baud_rate: int, debug: bool) -> bool:
+    """
+    Connect to MeshCore device on startup.
+
+    Args:
+        serial_port: Serial port path
+        baud_rate: Baud rate for connection
+        debug: Enable debug mode
+
+    Returns:
+        True if connected successfully, False otherwise
+    """
+    print(f"[STARTUP] Attempting to connect to {serial_port} at {baud_rate} baud...", file=sys.stderr)
+
+    try:
+        state.meshcore = await MeshCore.create_serial(serial_port, baud_rate, debug=debug)
+        state.connection_type = "serial"
+        state.connection_params = {"port": serial_port, "baud_rate": baud_rate}
+        state.debug = debug
+
+        print(f"[STARTUP] Successfully connected to MeshCore device on {serial_port}", file=sys.stderr)
+        print(f"[STARTUP] Connection state - Type: {state.connection_type}, Debug: {state.debug}", file=sys.stderr)
+        return True
+
+    except Exception as e:
+        print(f"[STARTUP] Failed to connect to {serial_port}: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        return False
+
+
 def parse_args():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
@@ -690,6 +721,22 @@ def parse_args():
         default=8000,
         help="Port to bind to (default: 8000)"
     )
+    parser.add_argument(
+        "--serial-port",
+        type=str,
+        help="Serial port to auto-connect on startup (e.g., /dev/ttyUSB0). If specified, server will fail-fast if connection fails."
+    )
+    parser.add_argument(
+        "--baud-rate",
+        type=int,
+        default=115200,
+        help="Baud rate for serial connection (default: 115200)"
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug mode for MeshCore connection"
+    )
     return parser.parse_args()
 
 
@@ -699,6 +746,23 @@ def main():
 
     print(f"Starting MeshCore MCP Server on {args.host}:{args.port}", file=sys.stderr)
     print(f"Server URL: http://{args.host}:{args.port}", file=sys.stderr)
+
+    # Auto-connect to serial device if specified
+    if args.serial_port:
+        print(f"[STARTUP] Auto-connect enabled for {args.serial_port}", file=sys.stderr)
+
+        # Run async connection in a sync context
+        connected = asyncio.run(startup_connect(args.serial_port, args.baud_rate, args.debug))
+
+        if not connected:
+            print(f"[STARTUP] FATAL: Failed to connect to {args.serial_port}", file=sys.stderr)
+            print(f"[STARTUP] Server will not start. Please check device connection and try again.", file=sys.stderr)
+            sys.exit(1)
+
+        print(f"[STARTUP] Device connected. Starting HTTP server...", file=sys.stderr)
+    else:
+        print(f"[STARTUP] No auto-connect configured. Use --serial-port to enable.", file=sys.stderr)
+        print(f"[STARTUP] Devices can be connected via meshcore_connect tool after server starts.", file=sys.stderr)
 
     # Get the Starlette app for streamable HTTP transport
     app = mcp.streamable_http_app()
