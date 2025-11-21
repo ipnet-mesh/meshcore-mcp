@@ -747,23 +747,6 @@ def main():
     print(f"Starting MeshCore MCP Server on {args.host}:{args.port}", file=sys.stderr)
     print(f"Server URL: http://{args.host}:{args.port}", file=sys.stderr)
 
-    # Auto-connect to serial device if specified
-    if args.serial_port:
-        print(f"[STARTUP] Auto-connect enabled for {args.serial_port}", file=sys.stderr)
-
-        # Run async connection in a sync context
-        connected = asyncio.run(startup_connect(args.serial_port, args.baud_rate, args.debug))
-
-        if not connected:
-            print(f"[STARTUP] FATAL: Failed to connect to {args.serial_port}", file=sys.stderr)
-            print(f"[STARTUP] Server will not start. Please check device connection and try again.", file=sys.stderr)
-            sys.exit(1)
-
-        print(f"[STARTUP] Device connected. Starting HTTP server...", file=sys.stderr)
-    else:
-        print(f"[STARTUP] No auto-connect configured. Use --serial-port to enable.", file=sys.stderr)
-        print(f"[STARTUP] Devices can be connected via meshcore_connect tool after server starts.", file=sys.stderr)
-
     # Get the Starlette app for streamable HTTP transport
     app = mcp.streamable_http_app()
 
@@ -781,6 +764,28 @@ def main():
             return await call_next(request)
 
     app.add_middleware(TrailingSlashMiddleware)
+
+    # Add startup event for auto-connect
+    if args.serial_port:
+        print(f"[STARTUP] Auto-connect enabled for {args.serial_port}", file=sys.stderr)
+
+        @app.on_event("startup")
+        async def startup_event():
+            """Connect to device on startup."""
+            print(f"[STARTUP] Server starting, connecting to device...", file=sys.stderr)
+            connected = await startup_connect(args.serial_port, args.baud_rate, args.debug)
+
+            if not connected:
+                print(f"[STARTUP] FATAL: Failed to connect to {args.serial_port}", file=sys.stderr)
+                print(f"[STARTUP] Shutting down server...", file=sys.stderr)
+                # Force exit since we can't stop uvicorn gracefully from here
+                import os
+                os._exit(1)
+
+            print(f"[STARTUP] Device connected. Server ready.", file=sys.stderr)
+    else:
+        print(f"[STARTUP] No auto-connect configured. Use --serial-port to enable.", file=sys.stderr)
+        print(f"[STARTUP] Devices can be connected via meshcore_connect tool after server starts.", file=sys.stderr)
 
     # Run with uvicorn to support custom host and port
     import uvicorn
