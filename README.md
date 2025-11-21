@@ -59,7 +59,7 @@ Starting MeshCore MCP Server on 0.0.0.0:8000
 Server URL: http://0.0.0.0:8000
 ```
 
-### With Claude Desktop (HTTP)
+### With Claude Desktop
 
 Add this configuration to your Claude Desktop config file:
 
@@ -88,31 +88,63 @@ For remote servers:
 }
 ```
 
-### With OpenAI Agents / Web Tools
+### With OpenWebUI
 
-The HTTP server is compatible with any MCP client that supports the Streamable HTTP transport:
+OpenWebUI uses [MCPO](https://github.com/open-webui/mcpo) (MCP-to-OpenAPI proxy) to connect to MCP servers. Configure MCPO with:
 
-```python
-# Example client connection
-import requests
+**1. Create a `config.json` file:**
 
-# List tools
-response = requests.post("http://localhost:8000/mcp/v1/tools/list")
-print(response.json())
-
-# Call a tool
-response = requests.post(
-    "http://localhost:8000/mcp/v1/tools/call",
-    json={
-        "name": "meshcore_connect",
-        "arguments": {
-            "type": "serial",
-            "port": "/dev/ttyUSB0"
-        }
+```json
+{
+  "mcpServers": {
+    "meshcore": {
+      "type": "streamable-http",
+      "url": "http://localhost:8000/mcp"
     }
-)
-print(response.json())
+  }
+}
 ```
+
+_See `examples/mcpo_config.json` for a complete example._
+
+For remote servers:
+```json
+{
+  "mcpServers": {
+    "meshcore": {
+      "type": "streamable-http",
+      "url": "http://your-server-ip:8000/mcp"
+    }
+  }
+}
+```
+
+**2. Run MCPO with Docker:**
+
+```bash
+# Note: MCPO runs on port 8080 to avoid conflict with the MCP server on 8000
+docker run -d \
+  --name mcpo \
+  -p 8080:8000 \
+  -v $(pwd)/config.json:/app/config/config.json \
+  ghcr.io/open-webui/mcpo:main
+```
+
+**Important:** The MCP server runs on port 8000, while MCPO is exposed on port 8080 to avoid conflicts. Adjust ports as needed for your environment.
+
+**3. Configure OpenWebUI:**
+
+In OpenWebUI settings, add the MCPO endpoint as an OpenAPI server. The tools will then be available to your AI models.
+
+**See also:** [OpenWebUI MCP Documentation](https://docs.openwebui.com/features/mcp/) and [MCPO GitHub](https://github.com/open-webui/mcpo)
+
+### With Other MCP Clients
+
+The HTTP server is compatible with any MCP client that supports the Streamable HTTP transport (MCP protocol 2025-03-26).
+
+**Server endpoint:** `http://localhost:8000/mcp`
+
+**Note:** The MCP endpoint requires proper MCP protocol handshaking with session management. Use an MCP-compatible client library (like the official MCP SDK) or a proxy like MCPO for integration with non-MCP tools.
 
 ## Tool Examples
 
@@ -239,21 +271,19 @@ Start the server:
 python -m meshcore_mcp.server --port 8000
 ```
 
-In another terminal, test with curl:
-```bash
-# List available tools
-curl -X POST http://localhost:8000/mcp/v1/tools/list
+**Testing with MCP Clients:**
 
-# Connect to a device
-curl -X POST http://localhost:8000/mcp/v1/tools/call \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "meshcore_connect",
-    "arguments": {
-      "type": "serial",
-      "port": "/dev/ttyUSB0"
-    }
-  }'
+The server uses MCP Streamable HTTP protocol and requires proper MCP client libraries for testing. Direct curl testing is not recommended due to session management requirements.
+
+For testing, use:
+- **Claude Desktop** with the configuration shown above
+- **MCPO** to expose as OpenAPI (see OpenWebUI section)
+- **MCP SDK** client libraries in your preferred language
+
+**Quick verification that server is running:**
+```bash
+# This should return an error about missing session ID (which confirms the MCP endpoint is active)
+curl -X GET http://localhost:8000/mcp -H "Accept: text/event-stream"
 ```
 
 ## Troubleshooting
@@ -277,6 +307,14 @@ curl -X POST http://localhost:8000/mcp/v1/tools/call \
 - Use the `pin` parameter if your device requires pairing
 - Ensure Bluetooth is enabled on your system
 - Check that BLE address format is correct (XX:XX:XX:XX:XX:XX)
+
+**OpenWebUI/MCPO Issues:**
+- Ensure the MCP server is running and accessible at the configured URL
+- Verify MCPO can reach the MCP server (check Docker network settings)
+- Confirm the URL includes `/mcp` endpoint: `http://localhost:8000/mcp`
+- Check MCPO logs: `docker logs mcpo`
+- For remote servers, ensure firewall rules allow connections
+- Verify the `type` is set to `"streamable-http"` in MCPO config
 
 ## Command-Line Options
 
