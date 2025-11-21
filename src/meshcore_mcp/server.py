@@ -9,7 +9,9 @@ Supports Serial, BLE, and TCP connections via HTTP/Streamable transport.
 import argparse
 import asyncio
 import sys
-from typing import Optional
+from typing import Optional, List, Dict, Any
+from datetime import datetime
+from collections import deque
 
 from mcp.server.fastmcp import FastMCP
 
@@ -28,6 +30,11 @@ class ServerState:
     connection_type: Optional[str] = None
     connection_params: dict = {}
     debug: bool = False
+
+    # Message listening state
+    message_buffer: deque = deque(maxlen=1000)  # Store up to 1000 messages
+    message_subscriptions: List = []  # Active subscriptions
+    is_listening: bool = False
 
 
 state = ServerState()
@@ -85,6 +92,51 @@ async def ensure_connected() -> Optional[str]:
 
     except Exception as e:
         return f"Auto-reconnect failed: {str(e)}"
+
+
+# Message handling callbacks
+async def handle_contact_message(event):
+    """Callback for handling received contact messages."""
+    try:
+        message_data = {
+            "type": "contact",
+            "timestamp": datetime.now().isoformat(),
+            "sender": event.payload.get("sender", "Unknown"),
+            "sender_key": event.payload.get("sender_key", "N/A"),
+            "text": event.payload.get("text", ""),
+            "raw_payload": event.payload
+        }
+        state.message_buffer.append(message_data)
+    except Exception as e:
+        print(f"Error handling contact message: {e}", file=sys.stderr)
+
+
+async def handle_channel_message(event):
+    """Callback for handling received channel messages."""
+    try:
+        message_data = {
+            "type": "channel",
+            "timestamp": datetime.now().isoformat(),
+            "channel": event.payload.get("channel", "Unknown"),
+            "sender": event.payload.get("sender", "Unknown"),
+            "sender_key": event.payload.get("sender_key", "N/A"),
+            "text": event.payload.get("text", ""),
+            "raw_payload": event.payload
+        }
+        state.message_buffer.append(message_data)
+    except Exception as e:
+        print(f"Error handling channel message: {e}", file=sys.stderr)
+
+
+def cleanup_message_subscriptions():
+    """Clean up all active message subscriptions."""
+    for subscription in state.message_subscriptions:
+        try:
+            subscription.unsubscribe()
+        except Exception as e:
+            print(f"Error unsubscribing: {e}", file=sys.stderr)
+    state.message_subscriptions.clear()
+    state.is_listening = False
 
 
 # Initialize MCP server with FastMCP
@@ -192,6 +244,10 @@ async def meshcore_disconnect() -> str:
         return "Not connected to any device"
 
     try:
+        # Clean up message subscriptions first
+        cleanup_message_subscriptions()
+        state.message_buffer.clear()
+
         await state.meshcore.disconnect()
         conn_type = state.connection_type
 
@@ -372,6 +428,177 @@ async def meshcore_get_battery() -> str:
 
     except Exception as e:
         return f"Get battery failed: {str(e)}"
+
+
+@mcp.tool()
+async def meshcore_start_message_listening() -> str:
+    """
+    Start listening for incoming messages from contacts and channels.
+
+    Messages will be stored in a buffer (up to 1000 messages) and can be retrieved
+    using meshcore_get_messages.
+
+    Returns:
+        Status message indicating if listening started successfully
+    """
+    # Ensure connected (auto-reconnect if needed)
+    error = await ensure_connected()
+    if error:
+        return error
+
+    if state.is_listening:
+        return "Already listening for messages"
+
+    try:
+        # Subscribe to contact messages
+        contact_sub = state.meshcore.subscribe(
+            EventType.CONTACT_MSG_RECV,
+            handle_contact_message
+        )
+        state.message_subscriptions.append(contact_sub)
+
+        # Subscribe to channel messages
+        channel_sub = state.meshcore.subscribe(
+            EventType.CHANNEL_MSG_RECV,
+            handle_channel_message
+        )
+        state.message_subscriptions.append(channel_sub)
+
+        # Start auto message fetching
+        state.meshcore.start_auto_message_fetching()
+
+        state.is_listening = True
+
+        return "Started listening for messages. Messages will be buffered and can be retrieved with meshcore_get_messages."
+
+    except Exception as e:
+        cleanup_message_subscriptions()
+        return f"Failed to start message listening: {str(e)}"
+
+
+@mcp.tool()
+async def meshcore_stop_message_listening() -> str:
+    """
+    Stop listening for incoming messages.
+
+    This will unsubscribe from message events but will NOT clear the message buffer.
+    Use meshcore_clear_messages to clear buffered messages.
+
+    Returns:
+        Status message
+    """
+    if not state.is_listening:
+        return "Not currently listening for messages"
+
+    try:
+        # Stop auto message fetching
+        if state.meshcore and state.meshcore.is_connected:
+            state.meshcore.stop_auto_message_fetching()
+
+        # Clean up subscriptions
+        cleanup_message_subscriptions()
+
+        return "Stopped listening for messages. Message buffer retained."
+
+    except Exception as e:
+        return f"Error stopping message listening: {str(e)}"
+
+
+@mcp.tool()
+async def meshcore_get_messages(
+    limit: Optional[int] = None,
+    clear_after_read: bool = False,
+    message_type: Optional[str] = None
+) -> str:
+    """
+    Retrieve messages from the message buffer.
+
+    Args:
+        limit: Maximum number of messages to return (most recent first). If None, returns all.
+        clear_after_read: If True, clears the returned messages from the buffer
+        message_type: Filter by message type ('contact' or 'channel'). If None, returns all.
+
+    Returns:
+        Formatted list of messages
+    """
+    if not state.message_buffer:
+        return "No messages in buffer"
+
+    try:
+        # Convert deque to list for easier manipulation
+        messages = list(state.message_buffer)
+
+        # Filter by message type if specified
+        if message_type:
+            if message_type not in ["contact", "channel"]:
+                return "Error: message_type must be 'contact' or 'channel'"
+            messages = [msg for msg in messages if msg.get("type") == message_type]
+
+        # Reverse to show most recent first
+        messages.reverse()
+
+        # Apply limit if specified
+        if limit and limit > 0:
+            messages = messages[:limit]
+
+        if not messages:
+            return f"No {message_type + ' ' if message_type else ''}messages found"
+
+        # Format output
+        output = f"Messages ({len(messages)} total):\n"
+        output += "=" * 60 + "\n"
+
+        for i, msg in enumerate(messages, 1):
+            msg_type = msg.get("type", "unknown").upper()
+            timestamp = msg.get("timestamp", "Unknown")
+            sender = msg.get("sender", "Unknown")
+            text = msg.get("text", "")
+
+            output += f"\n[{i}] {msg_type} MESSAGE\n"
+            output += f"  Time: {timestamp}\n"
+            output += f"  From: {sender}\n"
+
+            if msg.get("type") == "channel":
+                output += f"  Channel: {msg.get('channel', 'Unknown')}\n"
+
+            output += f"  Message: {text}\n"
+            output += "-" * 60 + "\n"
+
+        # Clear buffer if requested
+        if clear_after_read:
+            if message_type:
+                # Remove only the filtered messages
+                state.message_buffer = deque(
+                    [msg for msg in state.message_buffer if msg.get("type") != message_type],
+                    maxlen=1000
+                )
+            elif limit:
+                # Remove the limited number of most recent messages
+                for _ in range(min(limit, len(messages))):
+                    if state.message_buffer:
+                        state.message_buffer.pop()
+            else:
+                # Clear all
+                state.message_buffer.clear()
+            output += "\n(Messages cleared from buffer)\n"
+
+        return output
+
+    except Exception as e:
+        return f"Error retrieving messages: {str(e)}"
+
+
+@mcp.tool()
+async def meshcore_clear_messages() -> str:
+    """
+    Clear all messages from the message buffer.
+
+    Returns:
+        Status message with number of messages cleared
+    """
+    count = len(state.message_buffer)
+    state.message_buffer.clear()
+    return f"Cleared {count} message(s) from buffer"
 
 
 def parse_args():
