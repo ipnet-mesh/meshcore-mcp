@@ -27,9 +27,64 @@ class ServerState:
     meshcore: Optional[MeshCore] = None
     connection_type: Optional[str] = None
     connection_params: dict = {}
+    debug: bool = False
 
 
 state = ServerState()
+
+
+async def ensure_connected() -> Optional[str]:
+    """
+    Ensure MeshCore is connected, automatically reconnecting if needed.
+
+    Returns:
+        None if connected successfully, error message otherwise
+    """
+    # If no connection params stored, can't auto-connect
+    if not state.connection_params:
+        return "Error: Not connected. Use meshcore_connect first."
+
+    # If already connected, nothing to do
+    if state.meshcore is not None and state.meshcore.is_connected:
+        return None
+
+    # Need to reconnect - recreate connection
+    try:
+        conn_type = state.connection_type
+        params = state.connection_params
+        debug = state.debug
+
+        if conn_type == "serial":
+            state.meshcore = await MeshCore.create_serial(
+                params["port"],
+                params["baud_rate"],
+                debug=debug
+            )
+        elif conn_type == "ble":
+            state.meshcore = await MeshCore.create_ble(
+                params["address"],
+                pin=params.get("pin")
+            )
+        elif conn_type == "tcp":
+            if params.get("auto_reconnect"):
+                state.meshcore = await MeshCore.create_tcp(
+                    params["host"],
+                    params["port"],
+                    auto_reconnect=True,
+                    max_reconnect_attempts=5
+                )
+            else:
+                state.meshcore = await MeshCore.create_tcp(
+                    params["host"],
+                    params["port"]
+                )
+        else:
+            return f"Error: Invalid stored connection type '{conn_type}'"
+
+        return None  # Success
+
+    except Exception as e:
+        return f"Auto-reconnect failed: {str(e)}"
 
 
 # Initialize MCP server with FastMCP
@@ -80,6 +135,7 @@ async def meshcore_connect(
             state.meshcore = await MeshCore.create_serial(port, baud_rate, debug=debug)
             state.connection_type = "serial"
             state.connection_params = {"port": port, "baud_rate": baud_rate}
+            state.debug = debug
 
         elif type == "ble":
             if not address:
@@ -88,6 +144,7 @@ async def meshcore_connect(
             state.meshcore = await MeshCore.create_ble(address, pin=pin)
             state.connection_type = "ble"
             state.connection_params = {"address": address, "pin": pin}
+            state.debug = debug
 
         elif type == "tcp":
             tcp_host = host or address
@@ -106,7 +163,12 @@ async def meshcore_connect(
                 state.meshcore = await MeshCore.create_tcp(tcp_host, port_int)
 
             state.connection_type = "tcp"
-            state.connection_params = {"host": tcp_host, "port": port_int}
+            state.connection_params = {
+                "host": tcp_host,
+                "port": port_int,
+                "auto_reconnect": auto_reconnect
+            }
+            state.debug = debug
 
         else:
             return f"Error: Invalid connection type '{type}'. Must be 'serial', 'ble', or 'tcp'."
@@ -117,6 +179,7 @@ async def meshcore_connect(
         state.meshcore = None
         state.connection_type = None
         state.connection_params = {}
+        state.debug = False
         return f"Connection failed: {str(e)}"
 
 
@@ -138,6 +201,7 @@ async def meshcore_disconnect() -> str:
         state.meshcore = None
         state.connection_type = None
         state.connection_params = {}
+        state.debug = False
 
         return f"Disconnected from {conn_type} device"
 
@@ -157,8 +221,10 @@ async def meshcore_send_message(destination: str, text: str) -> str:
     Returns:
         Send status message with result
     """
-    if state.meshcore is None or not state.meshcore.is_connected:
-        return "Error: Not connected. Use meshcore_connect first."
+    # Ensure connected (auto-reconnect if needed)
+    error = await ensure_connected()
+    if error:
+        return error
 
     try:
         result = await state.meshcore.commands.send_msg(destination, text)
@@ -180,8 +246,10 @@ async def meshcore_get_contacts() -> str:
     Returns:
         Formatted list of contacts with names and keys
     """
-    if state.meshcore is None or not state.meshcore.is_connected:
-        return "Error: Not connected. Use meshcore_connect first."
+    # Ensure connected (auto-reconnect if needed)
+    error = await ensure_connected()
+    if error:
+        return error
 
     try:
         result = await state.meshcore.commands.get_contacts()
@@ -215,8 +283,10 @@ async def meshcore_get_device_info() -> str:
     Returns:
         Formatted device information
     """
-    if state.meshcore is None or not state.meshcore.is_connected:
-        return "Error: Not connected. Use meshcore_connect first."
+    # Ensure connected (auto-reconnect if needed)
+    error = await ensure_connected()
+    if error:
+        return error
 
     try:
         result = await state.meshcore.commands.send_device_query()
@@ -245,8 +315,10 @@ async def meshcore_get_battery() -> str:
     Returns:
         Battery status information
     """
-    if state.meshcore is None or not state.meshcore.is_connected:
-        return "Error: Not connected. Use meshcore_connect first."
+    # Ensure connected (auto-reconnect if needed)
+    error = await ensure_connected()
+    if error:
+        return error
 
     try:
         result = await state.meshcore.commands.get_bat()
