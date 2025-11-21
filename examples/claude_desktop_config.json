@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "meshcore": {
+      "command": "python",
+      "args": [
+        "-m",
+        "meshcore_mcp.server"
+      ],
+      "cwd": "/path/to/meshcore-mcp"
+    }
+  }
+}
