@@ -259,15 +259,24 @@ async def meshcore_get_contacts() -> str:
 
         contacts = result.payload
 
+        # Check if payload is a string (error/status message from device)
+        if isinstance(contacts, str):
+            return contacts
+
         if not contacts:
             return "No contacts found"
 
         # Format contacts nicely
         output = "Contacts:\n"
         for i, contact in enumerate(contacts, 1):
-            name = contact.get("name", "Unknown")
-            key = contact.get("pubkey_prefix", "N/A")
-            output += f"{i}. {name} (key: {key})\n"
+            # Ensure contact is a dict before accessing attributes
+            if isinstance(contact, dict):
+                name = contact.get("name", "Unknown")
+                key = contact.get("pubkey_prefix", "N/A")
+                output += f"{i}. {name} (key: {key})\n"
+            else:
+                # Handle non-dict contact entries gracefully
+                output += f"{i}. {contact}\n"
 
         return output
 
