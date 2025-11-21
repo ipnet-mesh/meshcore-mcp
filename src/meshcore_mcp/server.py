@@ -297,8 +297,12 @@ def main():
     print(f"Starting MeshCore MCP Server on {args.host}:{args.port}", file=sys.stderr)
     print(f"Server URL: http://{args.host}:{args.port}", file=sys.stderr)
 
-    # Run the FastMCP server with streamable HTTP transport
-    mcp.run(transport="streamable-http", host=args.host, port=args.port)
+    # Get the Starlette app for streamable HTTP transport
+    app = mcp.streamable_http_app()
+
+    # Run with uvicorn to support custom host and port
+    import uvicorn
+    uvicorn.run(app, host=args.host, port=args.port)
 
 
 if __name__ == "__main__":
