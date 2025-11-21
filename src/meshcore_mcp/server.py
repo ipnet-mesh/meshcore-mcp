@@ -768,6 +768,7 @@ def main():
     # MCPO may append trailing slashes which causes 307 redirects by default
     from starlette.middleware.base import BaseHTTPMiddleware
     from starlette.requests import Request
+    from contextlib import asynccontextmanager
 
     class TrailingSlashMiddleware(BaseHTTPMiddleware):
         """Normalize trailing slashes to avoid 307 redirects."""
@@ -779,13 +780,14 @@ def main():
 
     app.add_middleware(TrailingSlashMiddleware)
 
-    # Add startup event for auto-connect
+    # Add startup/shutdown handling via lifespan
     if args.serial_port:
         print(f"[STARTUP] Auto-connect enabled for {args.serial_port}", file=sys.stderr)
 
-        @app.on_event("startup")
-        async def startup_event():
-            """Connect to device on startup."""
+        @asynccontextmanager
+        async def lifespan(app):
+            """Lifespan context manager for startup/shutdown."""
+            # Startup
             print(f"[STARTUP] Server starting, connecting to device...", file=sys.stderr)
             connected = await startup_connect(args.serial_port, args.baud_rate, args.debug)
 
@@ -837,6 +839,18 @@ def main():
                 traceback.print_exc(file=sys.stderr)
 
             print(f"[STARTUP] Server ready.", file=sys.stderr)
+
+            yield
+
+            # Shutdown
+            print(f"[SHUTDOWN] Cleaning up...", file=sys.stderr)
+            if state.meshcore:
+                cleanup_message_subscriptions()
+                await state.meshcore.disconnect()
+                print(f"[SHUTDOWN] Device disconnected.", file=sys.stderr)
+
+        # Override the app's lifespan
+        app.router.lifespan_context = lifespan
     else:
         print(f"[STARTUP] No auto-connect configured. Use --serial-port to enable.", file=sys.stderr)
         print(f"[STARTUP] Devices can be connected via meshcore_connect tool after server starts.", file=sys.stderr)

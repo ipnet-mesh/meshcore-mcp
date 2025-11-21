@@ -71,10 +71,19 @@ The server will print:
 Starting MeshCore MCP Server on 0.0.0.0:8000
 Server URL: http://0.0.0.0:8000
 [STARTUP] Auto-connect enabled for /dev/ttyUSB0
+[STARTUP] Server starting, connecting to device...
 [STARTUP] Attempting to connect to /dev/ttyUSB0 at 115200 baud...
 [STARTUP] Successfully connected to MeshCore device on /dev/ttyUSB0
-[STARTUP] Device connected. Starting HTTP server...
+[STARTUP] Device connected. Starting message listening...
+[STARTUP] Subscribed to contact messages
+[STARTUP] Subscribed to channel messages
+[STARTUP] Subscribed to advertisements
+[STARTUP] Auto message fetching started
+[STARTUP] Message listening active with 3 subscriptions
+[STARTUP] Server ready.
 ```
+
+The server automatically subscribes to incoming messages and advertisements, so it's ready to receive and buffer messages immediately.
 
 ### With Claude Desktop
 
