@@ -243,17 +243,14 @@ async def meshcore_send_message(
         return "Error: Must specify either 'destination' or 'channel'"
 
     try:
-        # Determine the target
         if channel is not None:
-            # Send to channel - use channel number as destination
-            target = str(channel)
+            # Send to channel using dedicated channel message method
+            result = await state.meshcore.commands.send_chan_msg(channel, text)
             msg_type = f"channel {channel}"
         else:
             # Send to individual contact
-            target = destination
+            result = await state.meshcore.commands.send_msg(destination, text)
             msg_type = f"contact {destination}"
-
-        result = await state.meshcore.commands.send_msg(target, text)
 
         if result.type == EventType.ERROR:
             return f"Send failed: {result.payload}"
