@@ -784,73 +784,79 @@ def main():
     if args.serial_port:
         print(f"[STARTUP] Auto-connect enabled for {args.serial_port}", file=sys.stderr)
 
+        # Save the original lifespan
+        original_lifespan = app.router.lifespan_context
+
         @asynccontextmanager
-        async def lifespan(app):
-            """Lifespan context manager for startup/shutdown."""
-            # Startup
-            print(f"[STARTUP] Server starting, connecting to device...", file=sys.stderr)
-            connected = await startup_connect(args.serial_port, args.baud_rate, args.debug)
+        async def combined_lifespan(app):
+            """Combined lifespan that chains our startup with FastMCP's."""
+            # Run FastMCP's startup first
+            async with original_lifespan(app):
+                # Now run our custom startup
+                print(f"[STARTUP] Server starting, connecting to device...", file=sys.stderr)
+                connected = await startup_connect(args.serial_port, args.baud_rate, args.debug)
 
-            if not connected:
-                print(f"[STARTUP] FATAL: Failed to connect to {args.serial_port}", file=sys.stderr)
-                print(f"[STARTUP] Shutting down server...", file=sys.stderr)
-                # Force exit since we can't stop uvicorn gracefully from here
-                import os
-                os._exit(1)
+                if not connected:
+                    print(f"[STARTUP] FATAL: Failed to connect to {args.serial_port}", file=sys.stderr)
+                    print(f"[STARTUP] Shutting down server...", file=sys.stderr)
+                    # Force exit since we can't stop uvicorn gracefully from here
+                    import os
+                    os._exit(1)
 
-            print(f"[STARTUP] Device connected. Starting message listening...", file=sys.stderr)
+                print(f"[STARTUP] Device connected. Starting message listening...", file=sys.stderr)
 
-            # Auto-start message listening
-            try:
-                # Subscribe to contact messages
-                contact_sub = state.meshcore.subscribe(
-                    EventType.CONTACT_MSG_RECV,
-                    handle_contact_message
-                )
-                state.message_subscriptions.append(contact_sub)
-                print(f"[STARTUP] Subscribed to contact messages", file=sys.stderr)
+                # Auto-start message listening
+                try:
+                    # Subscribe to contact messages
+                    contact_sub = state.meshcore.subscribe(
+                        EventType.CONTACT_MSG_RECV,
+                        handle_contact_message
+                    )
+                    state.message_subscriptions.append(contact_sub)
+                    print(f"[STARTUP] Subscribed to contact messages", file=sys.stderr)
 
-                # Subscribe to channel messages
-                channel_sub = state.meshcore.subscribe(
-                    EventType.CHANNEL_MSG_RECV,
-                    handle_channel_message
-                )
-                state.message_subscriptions.append(channel_sub)
-                print(f"[STARTUP] Subscribed to channel messages", file=sys.stderr)
+                    # Subscribe to channel messages
+                    channel_sub = state.meshcore.subscribe(
+                        EventType.CHANNEL_MSG_RECV,
+                        handle_channel_message
+                    )
+                    state.message_subscriptions.append(channel_sub)
+                    print(f"[STARTUP] Subscribed to channel messages", file=sys.stderr)
 
-                # Subscribe to advertisements
-                advert_sub = state.meshcore.subscribe(
-                    EventType.ADVERTISEMENT,
-                    handle_advertisement
-                )
-                state.message_subscriptions.append(advert_sub)
-                print(f"[STARTUP] Subscribed to advertisements", file=sys.stderr)
+                    # Subscribe to advertisements
+                    advert_sub = state.meshcore.subscribe(
+                        EventType.ADVERTISEMENT,
+                        handle_advertisement
+                    )
+                    state.message_subscriptions.append(advert_sub)
+                    print(f"[STARTUP] Subscribed to advertisements", file=sys.stderr)
 
-                # Start auto message fetching
-                await state.meshcore.start_auto_message_fetching()
-                print(f"[STARTUP] Auto message fetching started", file=sys.stderr)
+                    # Start auto message fetching
+                    await state.meshcore.start_auto_message_fetching()
+                    print(f"[STARTUP] Auto message fetching started", file=sys.stderr)
 
-                state.is_listening = True
-                print(f"[STARTUP] Message listening active with {len(state.message_subscriptions)} subscriptions", file=sys.stderr)
+                    state.is_listening = True
+                    print(f"[STARTUP] Message listening active with {len(state.message_subscriptions)} subscriptions", file=sys.stderr)
 
-            except Exception as e:
-                print(f"[STARTUP] WARNING: Failed to start message listening: {e}", file=sys.stderr)
-                import traceback
-                traceback.print_exc(file=sys.stderr)
+                except Exception as e:
+                    print(f"[STARTUP] WARNING: Failed to start message listening: {e}", file=sys.stderr)
+                    import traceback
+                    traceback.print_exc(file=sys.stderr)
 
-            print(f"[STARTUP] Server ready.", file=sys.stderr)
+                print(f"[STARTUP] Server ready.", file=sys.stderr)
 
-            yield
+                try:
+                    yield
+                finally:
+                    # Shutdown - runs before FastMCP's shutdown
+                    print(f"[SHUTDOWN] Cleaning up...", file=sys.stderr)
+                    if state.meshcore:
+                        cleanup_message_subscriptions()
+                        await state.meshcore.disconnect()
+                        print(f"[SHUTDOWN] Device disconnected.", file=sys.stderr)
 
-            # Shutdown
-            print(f"[SHUTDOWN] Cleaning up...", file=sys.stderr)
-            if state.meshcore:
-                cleanup_message_subscriptions()
-                await state.meshcore.disconnect()
-                print(f"[SHUTDOWN] Device disconnected.", file=sys.stderr)
-
-        # Override the app's lifespan
-        app.router.lifespan_context = lifespan
+        # Replace with combined lifespan
+        app.router.lifespan_context = combined_lifespan
     else:
         print(f"[STARTUP] No auto-connect configured. Use --serial-port to enable.", file=sys.stderr)
         print(f"[STARTUP] Devices can be connected via meshcore_connect tool after server starts.", file=sys.stderr)
