@@ -142,6 +142,20 @@ async def handle_channel_message(event):
         traceback.print_exc(file=sys.stderr)
 
 
+async def handle_advertisement(event):
+    """Callback for handling advertisement events."""
+    try:
+        print(f"[DEBUG] Advertisement event received: {event.type}", file=sys.stderr)
+        print(f"[DEBUG] Advertisement payload: {event.payload}", file=sys.stderr)
+
+        # Advertisements contain info about nearby devices
+        # This is useful for monitoring mesh network activity
+    except Exception as e:
+        print(f"[ERROR] Error handling advertisement: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+
+
 def cleanup_message_subscriptions():
     """Clean up all active message subscriptions."""
     print(f"[DEBUG] Cleaning up {len(state.message_subscriptions)} message subscriptions", file=sys.stderr)
@@ -782,7 +796,47 @@ def main():
                 import os
                 os._exit(1)
 
-            print(f"[STARTUP] Device connected. Server ready.", file=sys.stderr)
+            print(f"[STARTUP] Device connected. Starting message listening...", file=sys.stderr)
+
+            # Auto-start message listening
+            try:
+                # Subscribe to contact messages
+                contact_sub = state.meshcore.subscribe(
+                    EventType.CONTACT_MSG_RECV,
+                    handle_contact_message
+                )
+                state.message_subscriptions.append(contact_sub)
+                print(f"[STARTUP] Subscribed to contact messages", file=sys.stderr)
+
+                # Subscribe to channel messages
+                channel_sub = state.meshcore.subscribe(
+                    EventType.CHANNEL_MSG_RECV,
+                    handle_channel_message
+                )
+                state.message_subscriptions.append(channel_sub)
+                print(f"[STARTUP] Subscribed to channel messages", file=sys.stderr)
+
+                # Subscribe to advertisements
+                advert_sub = state.meshcore.subscribe(
+                    EventType.ADVERTISEMENT,
+                    handle_advertisement
+                )
+                state.message_subscriptions.append(advert_sub)
+                print(f"[STARTUP] Subscribed to advertisements", file=sys.stderr)
+
+                # Start auto message fetching
+                await state.meshcore.start_auto_message_fetching()
+                print(f"[STARTUP] Auto message fetching started", file=sys.stderr)
+
+                state.is_listening = True
+                print(f"[STARTUP] Message listening active with {len(state.message_subscriptions)} subscriptions", file=sys.stderr)
+
+            except Exception as e:
+                print(f"[STARTUP] WARNING: Failed to start message listening: {e}", file=sys.stderr)
+                import traceback
+                traceback.print_exc(file=sys.stderr)
+
+            print(f"[STARTUP] Server ready.", file=sys.stderr)
     else:
         print(f"[STARTUP] No auto-connect configured. Use --serial-port to enable.", file=sys.stderr)
         print(f"[STARTUP] Devices can be connected via meshcore_connect tool after server starts.", file=sys.stderr)
