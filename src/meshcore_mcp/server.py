@@ -98,6 +98,9 @@ async def ensure_connected() -> Optional[str]:
 async def handle_contact_message(event):
     """Callback for handling received contact messages."""
     try:
+        print(f"[DEBUG] Contact message event received: {event.type}", file=sys.stderr)
+        print(f"[DEBUG] Event payload: {event.payload}", file=sys.stderr)
+
         message_data = {
             "type": "contact",
             "timestamp": datetime.now().isoformat(),
@@ -107,13 +110,20 @@ async def handle_contact_message(event):
             "raw_payload": event.payload
         }
         state.message_buffer.append(message_data)
+        print(f"[DEBUG] Contact message added to buffer. Buffer size: {len(state.message_buffer)}", file=sys.stderr)
+        print(f"[DEBUG] Message from {message_data['sender']}: {message_data['text']}", file=sys.stderr)
     except Exception as e:
-        print(f"Error handling contact message: {e}", file=sys.stderr)
+        print(f"[ERROR] Error handling contact message: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
 
 
 async def handle_channel_message(event):
     """Callback for handling received channel messages."""
     try:
+        print(f"[DEBUG] Channel message event received: {event.type}", file=sys.stderr)
+        print(f"[DEBUG] Event payload: {event.payload}", file=sys.stderr)
+
         message_data = {
             "type": "channel",
             "timestamp": datetime.now().isoformat(),
@@ -124,19 +134,26 @@ async def handle_channel_message(event):
             "raw_payload": event.payload
         }
         state.message_buffer.append(message_data)
+        print(f"[DEBUG] Channel message added to buffer. Buffer size: {len(state.message_buffer)}", file=sys.stderr)
+        print(f"[DEBUG] Message from {message_data['sender']} on channel {message_data['channel']}: {message_data['text']}", file=sys.stderr)
     except Exception as e:
-        print(f"Error handling channel message: {e}", file=sys.stderr)
+        print(f"[ERROR] Error handling channel message: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
 
 
 def cleanup_message_subscriptions():
     """Clean up all active message subscriptions."""
+    print(f"[DEBUG] Cleaning up {len(state.message_subscriptions)} message subscriptions", file=sys.stderr)
     for subscription in state.message_subscriptions:
         try:
             subscription.unsubscribe()
+            print(f"[DEBUG] Unsubscribed from: {subscription}", file=sys.stderr)
         except Exception as e:
-            print(f"Error unsubscribing: {e}", file=sys.stderr)
+            print(f"[ERROR] Error unsubscribing: {e}", file=sys.stderr)
     state.message_subscriptions.clear()
     state.is_listening = False
+    print(f"[DEBUG] Message listening cleanup complete. Listening: {state.is_listening}", file=sys.stderr)
 
 
 # Initialize MCP server with FastMCP
@@ -441,37 +458,55 @@ async def meshcore_start_message_listening() -> str:
     Returns:
         Status message indicating if listening started successfully
     """
+    print(f"[DEBUG] meshcore_start_message_listening called", file=sys.stderr)
+    print(f"[DEBUG] Current listening state: {state.is_listening}", file=sys.stderr)
+    print(f"[DEBUG] Current buffer size: {len(state.message_buffer)}", file=sys.stderr)
+
     # Ensure connected (auto-reconnect if needed)
     error = await ensure_connected()
     if error:
+        print(f"[DEBUG] Connection check failed: {error}", file=sys.stderr)
         return error
 
+    print(f"[DEBUG] Connection verified. Connected: {state.meshcore.is_connected if state.meshcore else False}", file=sys.stderr)
+
     if state.is_listening:
+        print(f"[DEBUG] Already listening with {len(state.message_subscriptions)} active subscriptions", file=sys.stderr)
         return "Already listening for messages"
 
     try:
+        print(f"[DEBUG] Subscribing to CONTACT_MSG_RECV events", file=sys.stderr)
         # Subscribe to contact messages
         contact_sub = state.meshcore.subscribe(
             EventType.CONTACT_MSG_RECV,
             handle_contact_message
         )
         state.message_subscriptions.append(contact_sub)
+        print(f"[DEBUG] Contact message subscription created: {contact_sub}", file=sys.stderr)
 
+        print(f"[DEBUG] Subscribing to CHANNEL_MSG_RECV events", file=sys.stderr)
         # Subscribe to channel messages
         channel_sub = state.meshcore.subscribe(
             EventType.CHANNEL_MSG_RECV,
             handle_channel_message
         )
         state.message_subscriptions.append(channel_sub)
+        print(f"[DEBUG] Channel message subscription created: {channel_sub}", file=sys.stderr)
 
         # Start auto message fetching
+        print(f"[DEBUG] Starting auto message fetching", file=sys.stderr)
         state.meshcore.start_auto_message_fetching()
+        print(f"[DEBUG] Auto message fetching started", file=sys.stderr)
 
         state.is_listening = True
+        print(f"[DEBUG] Message listening started successfully. Active subscriptions: {len(state.message_subscriptions)}", file=sys.stderr)
 
         return "Started listening for messages. Messages will be buffered and can be retrieved with meshcore_get_messages."
 
     except Exception as e:
+        print(f"[ERROR] Failed to start message listening: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         cleanup_message_subscriptions()
         return f"Failed to start message listening: {str(e)}"
 
@@ -487,20 +522,31 @@ async def meshcore_stop_message_listening() -> str:
     Returns:
         Status message
     """
+    print(f"[DEBUG] meshcore_stop_message_listening called", file=sys.stderr)
+    print(f"[DEBUG] Current listening state: {state.is_listening}", file=sys.stderr)
+    print(f"[DEBUG] Active subscriptions: {len(state.message_subscriptions)}", file=sys.stderr)
+
     if not state.is_listening:
+        print(f"[DEBUG] Not currently listening, nothing to stop", file=sys.stderr)
         return "Not currently listening for messages"
 
     try:
         # Stop auto message fetching
         if state.meshcore and state.meshcore.is_connected:
+            print(f"[DEBUG] Stopping auto message fetching", file=sys.stderr)
             state.meshcore.stop_auto_message_fetching()
+            print(f"[DEBUG] Auto message fetching stopped", file=sys.stderr)
 
         # Clean up subscriptions
         cleanup_message_subscriptions()
 
+        print(f"[DEBUG] Message listening stopped. Buffer size: {len(state.message_buffer)}", file=sys.stderr)
         return "Stopped listening for messages. Message buffer retained."
 
     except Exception as e:
+        print(f"[ERROR] Error stopping message listening: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         return f"Error stopping message listening: {str(e)}"
 
 
@@ -521,18 +567,27 @@ async def meshcore_get_messages(
     Returns:
         Formatted list of messages
     """
+    print(f"[DEBUG] meshcore_get_messages called", file=sys.stderr)
+    print(f"[DEBUG] Buffer size: {len(state.message_buffer)}", file=sys.stderr)
+    print(f"[DEBUG] Parameters - limit: {limit}, clear_after_read: {clear_after_read}, message_type: {message_type}", file=sys.stderr)
+    print(f"[DEBUG] Is listening: {state.is_listening}", file=sys.stderr)
+
     if not state.message_buffer:
+        print(f"[DEBUG] No messages in buffer", file=sys.stderr)
         return "No messages in buffer"
 
     try:
         # Convert deque to list for easier manipulation
         messages = list(state.message_buffer)
+        print(f"[DEBUG] Retrieved {len(messages)} messages from buffer", file=sys.stderr)
 
         # Filter by message type if specified
         if message_type:
             if message_type not in ["contact", "channel"]:
+                print(f"[DEBUG] Invalid message_type: {message_type}", file=sys.stderr)
                 return "Error: message_type must be 'contact' or 'channel'"
             messages = [msg for msg in messages if msg.get("type") == message_type]
+            print(f"[DEBUG] Filtered to {len(messages)} {message_type} messages", file=sys.stderr)
 
         # Reverse to show most recent first
         messages.reverse()
@@ -540,8 +595,10 @@ async def meshcore_get_messages(
         # Apply limit if specified
         if limit and limit > 0:
             messages = messages[:limit]
+            print(f"[DEBUG] Limited to {len(messages)} messages", file=sys.stderr)
 
         if not messages:
+            print(f"[DEBUG] No messages found after filtering", file=sys.stderr)
             return f"No {message_type + ' ' if message_type else ''}messages found"
 
         # Format output
@@ -566,25 +623,37 @@ async def meshcore_get_messages(
 
         # Clear buffer if requested
         if clear_after_read:
+            print(f"[DEBUG] Clearing messages from buffer", file=sys.stderr)
             if message_type:
                 # Remove only the filtered messages
+                before_count = len(state.message_buffer)
                 state.message_buffer = deque(
                     [msg for msg in state.message_buffer if msg.get("type") != message_type],
                     maxlen=1000
                 )
+                print(f"[DEBUG] Removed {before_count - len(state.message_buffer)} {message_type} messages", file=sys.stderr)
             elif limit:
                 # Remove the limited number of most recent messages
+                removed = 0
                 for _ in range(min(limit, len(messages))):
                     if state.message_buffer:
                         state.message_buffer.pop()
+                        removed += 1
+                print(f"[DEBUG] Removed {removed} most recent messages", file=sys.stderr)
             else:
                 # Clear all
+                cleared = len(state.message_buffer)
                 state.message_buffer.clear()
+                print(f"[DEBUG] Cleared all {cleared} messages", file=sys.stderr)
             output += "\n(Messages cleared from buffer)\n"
 
+        print(f"[DEBUG] Returning {len(messages)} formatted messages. Buffer size now: {len(state.message_buffer)}", file=sys.stderr)
         return output
 
     except Exception as e:
+        print(f"[ERROR] Error retrieving messages: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         return f"Error retrieving messages: {str(e)}"
 
 
@@ -596,8 +665,11 @@ async def meshcore_clear_messages() -> str:
     Returns:
         Status message with number of messages cleared
     """
+    print(f"[DEBUG] meshcore_clear_messages called", file=sys.stderr)
     count = len(state.message_buffer)
+    print(f"[DEBUG] Clearing {count} messages from buffer", file=sys.stderr)
     state.message_buffer.clear()
+    print(f"[DEBUG] Buffer cleared. New size: {len(state.message_buffer)}", file=sys.stderr)
     return f"Cleared {count} message(s) from buffer"
 
 
