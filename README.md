@@ -295,16 +295,20 @@ Messages (2 total):
 [1] CONTACT MESSAGE
   Time: 2025-11-21T10:30:15
   From: Alice
+  Reply To: a1b2c3
   Message: Got it, see you at 3!
 ------------------------------------------------------------
 
 [2] CHANNEL MESSAGE
   Time: 2025-11-21T10:32:00
   From: Bob
+  Reply To: d4e5f6
   Channel: 0
   Message: Weather looks good today
 ------------------------------------------------------------
 ```
+
+The "Reply To" field shows the sender's public key prefix, which can be used with meshcore_send_message to reply to that specific contact.
 
 ## Architecture
 

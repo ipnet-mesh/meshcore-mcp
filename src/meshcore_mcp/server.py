@@ -106,12 +106,13 @@ async def handle_contact_message(event):
             "timestamp": datetime.now().isoformat(),
             "sender": event.payload.get("sender", "Unknown"),
             "sender_key": event.payload.get("sender_key", "N/A"),
+            "pubkey_prefix": event.payload.get("pubkey_prefix", "N/A"),
             "text": event.payload.get("text", ""),
             "raw_payload": event.payload
         }
         state.message_buffer.append(message_data)
         print(f"[DEBUG] Contact message added to buffer. Buffer size: {len(state.message_buffer)}", file=sys.stderr)
-        print(f"[DEBUG] Message from {message_data['sender']}: {message_data['text']}", file=sys.stderr)
+        print(f"[DEBUG] Message from {message_data['sender']} (pubkey: {message_data['pubkey_prefix']}): {message_data['text']}", file=sys.stderr)
     except Exception as e:
         print(f"[ERROR] Error handling contact message: {e}", file=sys.stderr)
         import traceback
@@ -130,12 +131,13 @@ async def handle_channel_message(event):
             "channel": event.payload.get("channel", "Unknown"),
             "sender": event.payload.get("sender", "Unknown"),
             "sender_key": event.payload.get("sender_key", "N/A"),
+            "pubkey_prefix": event.payload.get("pubkey_prefix", "N/A"),
             "text": event.payload.get("text", ""),
             "raw_payload": event.payload
         }
         state.message_buffer.append(message_data)
         print(f"[DEBUG] Channel message added to buffer. Buffer size: {len(state.message_buffer)}", file=sys.stderr)
-        print(f"[DEBUG] Message from {message_data['sender']} on channel {message_data['channel']}: {message_data['text']}", file=sys.stderr)
+        print(f"[DEBUG] Message from {message_data['sender']} (pubkey: {message_data['pubkey_prefix']}) on channel {message_data['channel']}: {message_data['text']}", file=sys.stderr)
     except Exception as e:
         print(f"[ERROR] Error handling channel message: {e}", file=sys.stderr)
         import traceback
@@ -623,11 +625,16 @@ async def meshcore_get_messages(
             msg_type = msg.get("type", "unknown").upper()
             timestamp = msg.get("timestamp", "Unknown")
             sender = msg.get("sender", "Unknown")
+            pubkey_prefix = msg.get("pubkey_prefix", "N/A")
             text = msg.get("text", "")
 
             output += f"\n[{i}] {msg_type} MESSAGE\n"
             output += f"  Time: {timestamp}\n"
             output += f"  From: {sender}\n"
+
+            # Show pubkey_prefix for replying (especially important for contact messages)
+            if pubkey_prefix != "N/A":
+                output += f"  Reply To: {pubkey_prefix}\n"
 
             if msg.get("type") == "channel":
                 output += f"  Channel: {msg.get('channel', 'Unknown')}\n"
