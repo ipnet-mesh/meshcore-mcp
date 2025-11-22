@@ -25,5 +25,5 @@ EXPOSE 8000
 ENTRYPOINT ["python", "-m", "meshcore_mcp.server"]
 CMD ["--host", "0.0.0.0", "--port", "8000"]
 
-LABEL org.opencontainers.image.source "https://github.com/ipnet-mesh/meshcore-mcp"
-LABEL org.opencontainers.image.description "MeshCore Companion Node MCP Server"
+LABEL org.opencontainers.image.source="https://github.com/ipnet-mesh/meshcore-mcp"
+LABEL org.opencontainers.image.description="MeshCore Companion Node MCP Server"
