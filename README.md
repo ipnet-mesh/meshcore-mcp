@@ -6,23 +6,17 @@ An MCP (Model Context Protocol) server that provides tools for interacting with 
 
 Here's a real conversation with Claude using the MeshCore MCP server:
 
----
+👤 **User:** Are you connected to MeshCore?
 
-> **User:** Are you connected to MeshCore?
+🤖 **Claude:** Yes, I am connected to MeshCore. I can see the device information showing a **Heltec V3** device running firmware version **8 (v1.10.0-9405e8b)** built on November 13, 2025. The device supports up to 350 contacts and 40 channels.
 
-**Claude:** Yes, I am connected to MeshCore. I can see the device information showing a **Heltec V3** device running firmware version **8 (v1.10.0-9405e8b)** built on November 13, 2025. The device supports up to 350 contacts and 40 channels.
+👤 **User:** Do I have any messages?
 
----
+🤖 **Claude:** No, you don't have any messages. Your message buffer is currently empty.
 
-> **User:** Do I have any messages?
+👤 **User:** Someone has sent a message. Can you check again?
 
-**Claude:** No, you don't have any messages. Your message buffer is currently empty.
-
----
-
-> **User:** Someone has sent a message. Can you check again?
-
-**Claude:** You're right! You do have a message now. There's **1 message** in your buffer:
+🤖 **Claude:** You're right! You do have a message now. There's **1 message** in your buffer:
 
 **Message Details:**
 - **From:** Unknown (Public Key: `2369759a4926`)
@@ -31,13 +25,9 @@ Here's a real conversation with Claude using the MeshCore MCP server:
 
 It appears to be from an unknown contact, but you can see their public key identifier.
 
----
+👤 **User:** Reply to that message saying "Hello World!"
 
-> **User:** Reply to that message saying "Hello World!"
-
-**Claude:** I've successfully sent your reply! The message **"Hello World!"** has been sent to contact `2369759a4926`. The system confirms the message was sent successfully.
-
----
+🤖 **Claude:** I've successfully sent your reply! The message **"Hello World!"** has been sent to contact `2369759a4926`. The system confirms the message was sent successfully.
 
 ## Features
 
