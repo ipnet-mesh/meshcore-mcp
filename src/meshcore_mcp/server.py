@@ -464,6 +464,42 @@ async def meshcore_get_battery() -> str:
 
 
 @mcp.tool()
+async def meshcore_send_advert(flood: bool = False) -> str:
+    """
+    Send an advertisement to the mesh network.
+
+    Advertisements announce your device's presence to other nodes in the network.
+
+    Args:
+        flood: If True, the advertisement is broadcasted and repeated by all repeaters (multi-hop).
+               If False, it's a zero-hop broadcast only to immediate listeners (default: False).
+
+    Returns:
+        Status message with result
+
+    Examples:
+        - Zero-hop advert (immediate neighbors only): flood=False
+        - Flooded advert (entire network via repeaters): flood=True
+    """
+    # Ensure connected (auto-reconnect if needed)
+    error = await ensure_connected()
+    if error:
+        return error
+
+    try:
+        result = await state.meshcore.commands.send_advert(flood=flood)
+
+        if result.type == EventType.ERROR:
+            return f"Send advert failed: {result.payload}"
+
+        advert_type = "flooded (multi-hop)" if flood else "zero-hop"
+        return f"Advertisement sent successfully ({advert_type})\nResult: {result.type.name}"
+
+    except Exception as e:
+        return f"Send advert failed: {str(e)}"
+
+
+@mcp.tool()
 async def meshcore_start_message_listening() -> str:
     """
     Start listening for incoming messages from contacts and channels.

@@ -8,6 +8,7 @@ An MCP (Model Context Protocol) server that provides tools for interacting with 
 - `meshcore_connect` - Connect to devices via Serial, BLE, or TCP
 - `meshcore_disconnect` - Cleanly disconnect from devices
 - `meshcore_send_message` - Send messages to contacts or channels
+- `meshcore_send_advert` - Send advertisements to announce device presence
 - `meshcore_get_contacts` - List all contacts
 - `meshcore_get_device_info` - Query device information
 - `meshcore_get_battery` - Check battery status
@@ -213,6 +214,24 @@ The HTTP server is compatible with any MCP client that supports the Streamable H
   "text": "Hello from MCP!"
 }
 ```
+
+### Sending an Advertisement
+
+**Zero-hop advertisement (immediate neighbors only):**
+```json
+{
+  "flood": false
+}
+```
+
+**Flooded advertisement (multi-hop via repeaters):**
+```json
+{
+  "flood": true
+}
+```
+
+Advertisements announce your device's presence to the mesh network. Use `flood: false` for zero-hop broadcasts to immediate neighbors, or `flood: true` for multi-hop broadcasts that are repeated by all network repeaters.
 
 ### Getting Contacts
 
