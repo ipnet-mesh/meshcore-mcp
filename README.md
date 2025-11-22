@@ -294,19 +294,21 @@ Messages (2 total):
 
 [1] CONTACT MESSAGE
   Time: 2025-11-21T10:30:15
-  From: Alice (a1b2c3)
+  From: Alice
+  Public Key: a1b2c3
   Message: Got it, see you at 3!
 ------------------------------------------------------------
 
 [2] CHANNEL MESSAGE
   Time: 2025-11-21T10:32:00
-  From: Bob (d4e5f6)
+  From: Bob
+  Public Key: d4e5f6
   Channel: 0
   Message: Weather looks good today
 ------------------------------------------------------------
 ```
 
-The public key prefix shown in parentheses (e.g., `a1b2c3`) is the sender's address and can be used with meshcore_send_message to reply to that contact.
+The "Public Key" field is the sender's address and should be used as the destination when replying with meshcore_send_message.
 
 ## Architecture
 

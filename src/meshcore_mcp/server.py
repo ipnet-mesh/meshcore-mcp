@@ -630,12 +630,11 @@ async def meshcore_get_messages(
 
             output += f"\n[{i}] {msg_type} MESSAGE\n"
             output += f"  Time: {timestamp}\n"
+            output += f"  From: {sender}\n"
 
-            # Show sender with pubkey_prefix for replying
+            # Show public key as a separate field for clarity
             if pubkey_prefix != "N/A":
-                output += f"  From: {sender} ({pubkey_prefix})\n"
-            else:
-                output += f"  From: {sender}\n"
+                output += f"  Public Key: {pubkey_prefix}\n"
 
             if msg.get("type") == "channel":
                 output += f"  Channel: {msg.get('channel', 'Unknown')}\n"
