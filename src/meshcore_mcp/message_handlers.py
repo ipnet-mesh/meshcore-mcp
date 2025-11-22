@@ -1,16 +1,20 @@
 """Message event handlers and subscription management."""
 
+import logging
 import sys
 from datetime import datetime
 
 from .state import state
 
+# Configure logger
+logger = logging.getLogger(__name__)
+
 
 async def handle_contact_message(event):
     """Callback for handling received contact messages."""
     try:
-        print(f"[DEBUG] Contact message event received: {event.type}", file=sys.stderr)
-        print(f"[DEBUG] Event payload: {event.payload}", file=sys.stderr)
+        logger.debug(f"Contact message event received: {event.type}")
+        logger.debug(f"Event payload: {event.payload}")
 
         message_data = {
             "type": "contact",
@@ -22,10 +26,10 @@ async def handle_contact_message(event):
             "raw_payload": event.payload
         }
         state.message_buffer.append(message_data)
-        print(f"[DEBUG] Contact message added to buffer. Buffer size: {len(state.message_buffer)}", file=sys.stderr)
-        print(f"[DEBUG] Message from {message_data['sender']} (pubkey: {message_data['pubkey_prefix']}): {message_data['text']}", file=sys.stderr)
+        logger.debug(f"Contact message added to buffer. Buffer size: {len(state.message_buffer)}")
+        logger.debug(f"Message from {message_data['sender']} (pubkey: {message_data['pubkey_prefix']}): {message_data['text']}")
     except Exception as e:
-        print(f"[ERROR] Error handling contact message: {e}", file=sys.stderr)
+        logger.error(f"Error handling contact message: {e}")
         import traceback
         traceback.print_exc(file=sys.stderr)
 
@@ -33,8 +37,8 @@ async def handle_contact_message(event):
 async def handle_channel_message(event):
     """Callback for handling received channel messages."""
     try:
-        print(f"[DEBUG] Channel message event received: {event.type}", file=sys.stderr)
-        print(f"[DEBUG] Event payload: {event.payload}", file=sys.stderr)
+        logger.debug(f"Channel message event received: {event.type}")
+        logger.debug(f"Event payload: {event.payload}")
 
         message_data = {
             "type": "channel",
@@ -47,10 +51,10 @@ async def handle_channel_message(event):
             "raw_payload": event.payload
         }
         state.message_buffer.append(message_data)
-        print(f"[DEBUG] Channel message added to buffer. Buffer size: {len(state.message_buffer)}", file=sys.stderr)
-        print(f"[DEBUG] Message from {message_data['sender']} (pubkey: {message_data['pubkey_prefix']}) on channel {message_data['channel']}: {message_data['text']}", file=sys.stderr)
+        logger.debug(f"Channel message added to buffer. Buffer size: {len(state.message_buffer)}")
+        logger.debug(f"Message from {message_data['sender']} (pubkey: {message_data['pubkey_prefix']}) on channel {message_data['channel']}: {message_data['text']}")
     except Exception as e:
-        print(f"[ERROR] Error handling channel message: {e}", file=sys.stderr)
+        logger.error(f"Error handling channel message: {e}")
         import traceback
         traceback.print_exc(file=sys.stderr)
 
@@ -58,26 +62,26 @@ async def handle_channel_message(event):
 async def handle_advertisement(event):
     """Callback for handling advertisement events."""
     try:
-        print(f"[DEBUG] Advertisement event received: {event.type}", file=sys.stderr)
-        print(f"[DEBUG] Advertisement payload: {event.payload}", file=sys.stderr)
+        logger.debug(f"Advertisement event received: {event.type}")
+        logger.debug(f"Advertisement payload: {event.payload}")
 
         # Advertisements contain info about nearby devices
         # This is useful for monitoring mesh network activity
     except Exception as e:
-        print(f"[ERROR] Error handling advertisement: {e}", file=sys.stderr)
+        logger.error(f"Error handling advertisement: {e}")
         import traceback
         traceback.print_exc(file=sys.stderr)
 
 
 def cleanup_message_subscriptions():
     """Clean up all active message subscriptions."""
-    print(f"[DEBUG] Cleaning up {len(state.message_subscriptions)} message subscriptions", file=sys.stderr)
+    logger.debug(f"Cleaning up {len(state.message_subscriptions)} message subscriptions")
     for subscription in state.message_subscriptions:
         try:
             subscription.unsubscribe()
-            print(f"[DEBUG] Unsubscribed from: {subscription}", file=sys.stderr)
+            logger.debug(f"Unsubscribed from: {subscription}")
         except Exception as e:
-            print(f"[ERROR] Error unsubscribing: {e}", file=sys.stderr)
+            logger.error(f"Error unsubscribing: {e}")
     state.message_subscriptions.clear()
     state.is_listening = False
-    print(f"[DEBUG] Message listening cleanup complete. Listening: {state.is_listening}", file=sys.stderr)
+    logger.debug(f"Message listening cleanup complete. Listening: {state.is_listening}")
