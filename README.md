@@ -2,6 +2,10 @@
 
 An MCP (Model Context Protocol) server that provides tools for interacting with MeshCore companion radio nodes via HTTP. This enables AI assistants and web-based tools to control and communicate with mesh network devices.
 
+![OpenWebUI Conversation](./docs/images/openwebui-conversation.png)
+
+The image above shows an example of how the OpenWebUI conversation interface appears during interaction.
+
 ## Features
 
 **Core Tools:**
