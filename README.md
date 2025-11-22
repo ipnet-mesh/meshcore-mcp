@@ -67,6 +67,13 @@ python -m meshcore_mcp.server --serial-port /dev/ttyUSB0 --baud-rate 115200
 
 This will connect to the device on startup and fail-fast if the connection fails. Debug mode can be enabled with `--debug`.
 
+**With auto-connect and clock sync (recommended for accurate timestamps):**
+```bash
+python -m meshcore_mcp.server --serial-port /dev/ttyUSB0 --sync-clock-on-startup
+```
+
+This will connect to the device on startup and automatically synchronize the device clock to the system time, ensuring accurate message timestamps.
+
 **As an installed command:**
 ```bash
 meshcore-mcp --serial-port /dev/ttyUSB0 --debug
@@ -80,6 +87,8 @@ Server URL: http://0.0.0.0:8000
 [STARTUP] Server starting, connecting to device...
 [STARTUP] Attempting to connect to /dev/ttyUSB0 at 115200 baud...
 [STARTUP] Successfully connected to MeshCore device on /dev/ttyUSB0
+[STARTUP] Syncing device clock to system time...
+[STARTUP] Clock synced successfully to 2025-11-22 14:30:00
 [STARTUP] Device connected. Starting message listening...
 [STARTUP] Subscribed to contact messages
 [STARTUP] Subscribed to channel messages
@@ -88,6 +97,8 @@ Server URL: http://0.0.0.0:8000
 [STARTUP] Message listening active with 3 subscriptions
 [STARTUP] Server ready.
 ```
+
+(Clock sync messages only appear when using `--sync-clock-on-startup`)
 
 The server automatically subscribes to incoming messages and advertisements, so it's ready to receive and buffer messages immediately.
 

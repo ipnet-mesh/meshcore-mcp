@@ -841,7 +841,7 @@ async def meshcore_sync_clock() -> str:
         return f"Clock sync failed: {str(e)}"
 
 
-async def startup_connect(serial_port: str, baud_rate: int, debug: bool) -> bool:
+async def startup_connect(serial_port: str, baud_rate: int, debug: bool, sync_clock: bool = False) -> bool:
     """
     Connect to MeshCore device on startup.
 
@@ -849,6 +849,7 @@ async def startup_connect(serial_port: str, baud_rate: int, debug: bool) -> bool
         serial_port: Serial port path
         baud_rate: Baud rate for connection
         debug: Enable debug mode
+        sync_clock: Sync device clock to system time after connecting
 
     Returns:
         True if connected successfully, False otherwise
@@ -863,6 +864,26 @@ async def startup_connect(serial_port: str, baud_rate: int, debug: bool) -> bool
 
         print(f"[STARTUP] Successfully connected to MeshCore device on {serial_port}", file=sys.stderr)
         print(f"[STARTUP] Connection state - Type: {state.connection_type}, Debug: {state.debug}", file=sys.stderr)
+
+        # Sync clock if requested
+        if sync_clock:
+            print(f"[STARTUP] Syncing device clock to system time...", file=sys.stderr)
+            try:
+                import time
+                current_time = int(time.time())
+                dt = datetime.fromtimestamp(current_time)
+
+                result = await state.meshcore.commands.set_time(current_time)
+
+                if result.type == EventType.ERROR:
+                    print(f"[STARTUP] WARNING: Clock sync failed: {result.payload}", file=sys.stderr)
+                else:
+                    print(f"[STARTUP] Clock synced successfully to {dt.strftime('%Y-%m-%d %H:%M:%S')}", file=sys.stderr)
+            except Exception as e:
+                print(f"[STARTUP] WARNING: Clock sync failed: {e}", file=sys.stderr)
+                import traceback
+                traceback.print_exc(file=sys.stderr)
+
         return True
 
     except Exception as e:
@@ -904,6 +925,11 @@ def parse_args():
         "--debug",
         action="store_true",
         help="Enable debug mode for MeshCore connection"
+    )
+    parser.add_argument(
+        "--sync-clock-on-startup",
+        action="store_true",
+        help="Automatically sync device clock to system time on startup (requires --serial-port)"
     )
     return parser.parse_args()
 
@@ -948,7 +974,7 @@ def main():
             async with original_lifespan(app):
                 # Now run our custom startup
                 print(f"[STARTUP] Server starting, connecting to device...", file=sys.stderr)
-                connected = await startup_connect(args.serial_port, args.baud_rate, args.debug)
+                connected = await startup_connect(args.serial_port, args.baud_rate, args.debug, args.sync_clock_on_startup)
 
                 if not connected:
                     print(f"[STARTUP] FATAL: Failed to connect to {args.serial_port}", file=sys.stderr)
