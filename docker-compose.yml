@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  meshcore-mcp:
+    build: .
+    container_name: meshcore-mcp
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+    # Uncomment to mount serial devices
+    # devices:
+    #   - "/dev/ttyUSB0:/dev/ttyUSB0"
+
+    # Optional: Override default command with arguments
+    # command: ["--host", "0.0.0.0", "--port", "8000", "--serial-port", "/dev/ttyUSB0", "--baud-rate", "115200", "--debug"]
+
+    # Optional: Set environment variables
+    # environment:
+    #   - TZ=UTC
