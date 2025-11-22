@@ -13,6 +13,11 @@ An MCP (Model Context Protocol) server that provides tools for interacting with 
 - `meshcore_get_device_info` - Query device information
 - `meshcore_get_battery` - Check battery status
 
+**Clock Management Tools:**
+- `meshcore_get_time` - Get current device time
+- `meshcore_set_time` - Set device time to specific Unix timestamp
+- `meshcore_sync_clock` - Sync device clock to system time
+
 **Message Listening Tools:**
 - `meshcore_start_message_listening` - Start receiving incoming messages
 - `meshcore_stop_message_listening` - Stop receiving messages
@@ -245,6 +250,28 @@ Call `meshcore_get_device_info` to get device name, version, and configuration d
 
 Call `meshcore_get_battery` to get current battery level and status.
 
+### Managing Device Clock
+
+**Get device time:**
+```json
+{}
+```
+Call `meshcore_get_time` to retrieve the current time from the device.
+
+**Sync clock to system time:**
+```json
+{}
+```
+Call `meshcore_sync_clock` to synchronize the device clock with the current system time. This is the easiest way to ensure accurate timestamps.
+
+**Set specific time:**
+```json
+{
+  "timestamp": 1732276800
+}
+```
+Call `meshcore_set_time` to set the device clock to a specific Unix timestamp (seconds since epoch).
+
 ### Listening for Messages
 
 **Start listening:**
@@ -290,6 +317,14 @@ You: What's my battery level?
 Claude: Let me check your battery status.
 [Uses meshcore_get_battery tool]
 Battery Level: 85%
+
+You: Sync the device clock
+
+Claude: I'll synchronize the device clock with the current system time.
+[Uses meshcore_sync_clock tool]
+Device clock synchronized successfully!
+  System Time: 2025-11-22 14:30:00
+  Unix Timestamp: 1732285800
 
 You: Send a message to Bob saying "Meeting at 3pm"
 
