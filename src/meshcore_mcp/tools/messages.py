@@ -1,5 +1,6 @@
 """Message sending and listening tools."""
 
+import logging
 import sys
 from typing import Optional
 from collections import deque
@@ -13,6 +14,9 @@ from ..state import state
 from ..connection import ensure_connected
 from ..channels import parse_channel_input, get_channel_display_name
 from ..message_handlers import handle_contact_message, handle_channel_message, cleanup_message_subscriptions
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 
 def register_tools(mcp):
@@ -98,53 +102,53 @@ def register_tools(mcp):
         Returns:
             Status message indicating if listening started successfully
         """
-        print(f"[DEBUG] meshcore_start_message_listening called", file=sys.stderr)
-        print(f"[DEBUG] Current listening state: {state.is_listening}", file=sys.stderr)
-        print(f"[DEBUG] Current buffer size: {len(state.message_buffer)}", file=sys.stderr)
+        logger.debug("meshcore_start_message_listening called")
+        logger.debug(f"Current listening state: {state.is_listening}")
+        logger.debug(f"Current buffer size: {len(state.message_buffer)}")
 
         # Ensure connected (auto-reconnect if needed)
         error = await ensure_connected()
         if error:
-            print(f"[DEBUG] Connection check failed: {error}", file=sys.stderr)
+            logger.debug(f"Connection check failed: {error}")
             return error
 
-        print(f"[DEBUG] Connection verified. Connected: {state.meshcore.is_connected if state.meshcore else False}", file=sys.stderr)
+        logger.debug(f"Connection verified. Connected: {state.meshcore.is_connected if state.meshcore else False}")
 
         if state.is_listening:
-            print(f"[DEBUG] Already listening with {len(state.message_subscriptions)} active subscriptions", file=sys.stderr)
+            logger.debug(f"Already listening with {len(state.message_subscriptions)} active subscriptions")
             return "Already listening for messages"
 
         try:
-            print(f"[DEBUG] Subscribing to CONTACT_MSG_RECV events", file=sys.stderr)
+            logger.debug("Subscribing to CONTACT_MSG_RECV events")
             # Subscribe to contact messages
             contact_sub = state.meshcore.subscribe(
                 EventType.CONTACT_MSG_RECV,
                 handle_contact_message
             )
             state.message_subscriptions.append(contact_sub)
-            print(f"[DEBUG] Contact message subscription created: {contact_sub}", file=sys.stderr)
+            logger.debug(f"Contact message subscription created: {contact_sub}")
 
-            print(f"[DEBUG] Subscribing to CHANNEL_MSG_RECV events", file=sys.stderr)
+            logger.debug("Subscribing to CHANNEL_MSG_RECV events")
             # Subscribe to channel messages
             channel_sub = state.meshcore.subscribe(
                 EventType.CHANNEL_MSG_RECV,
                 handle_channel_message
             )
             state.message_subscriptions.append(channel_sub)
-            print(f"[DEBUG] Channel message subscription created: {channel_sub}", file=sys.stderr)
+            logger.debug(f"Channel message subscription created: {channel_sub}")
 
             # Start auto message fetching
-            print(f"[DEBUG] Starting auto message fetching", file=sys.stderr)
+            logger.debug("Starting auto message fetching")
             await state.meshcore.start_auto_message_fetching()
-            print(f"[DEBUG] Auto message fetching started", file=sys.stderr)
+            logger.debug("Auto message fetching started")
 
             state.is_listening = True
-            print(f"[DEBUG] Message listening started successfully. Active subscriptions: {len(state.message_subscriptions)}", file=sys.stderr)
+            logger.debug(f"Message listening started successfully. Active subscriptions: {len(state.message_subscriptions)}")
 
             return "Started listening for messages. Messages will be buffered and can be retrieved with meshcore_get_messages."
 
         except Exception as e:
-            print(f"[ERROR] Failed to start message listening: {e}", file=sys.stderr)
+            logger.error(f"Failed to start message listening: {e}")
             import traceback
             traceback.print_exc(file=sys.stderr)
             cleanup_message_subscriptions()
@@ -161,29 +165,29 @@ def register_tools(mcp):
         Returns:
             Status message
         """
-        print(f"[DEBUG] meshcore_stop_message_listening called", file=sys.stderr)
-        print(f"[DEBUG] Current listening state: {state.is_listening}", file=sys.stderr)
-        print(f"[DEBUG] Active subscriptions: {len(state.message_subscriptions)}", file=sys.stderr)
+        logger.debug("meshcore_stop_message_listening called")
+        logger.debug(f"Current listening state: {state.is_listening}")
+        logger.debug(f"Active subscriptions: {len(state.message_subscriptions)}")
 
         if not state.is_listening:
-            print(f"[DEBUG] Not currently listening, nothing to stop", file=sys.stderr)
+            logger.debug("Not currently listening, nothing to stop")
             return "Not currently listening for messages"
 
         try:
             # Stop auto message fetching
             if state.meshcore and state.meshcore.is_connected:
-                print(f"[DEBUG] Stopping auto message fetching", file=sys.stderr)
+                logger.debug("Stopping auto message fetching")
                 await state.meshcore.stop_auto_message_fetching()
-                print(f"[DEBUG] Auto message fetching stopped", file=sys.stderr)
+                logger.debug("Auto message fetching stopped")
 
             # Clean up subscriptions
             cleanup_message_subscriptions()
 
-            print(f"[DEBUG] Message listening stopped. Buffer size: {len(state.message_buffer)}", file=sys.stderr)
+            logger.debug(f"Message listening stopped. Buffer size: {len(state.message_buffer)}")
             return "Stopped listening for messages. Message buffer retained."
 
         except Exception as e:
-            print(f"[ERROR] Error stopping message listening: {e}", file=sys.stderr)
+            logger.error(f"Error stopping message listening: {e}")
             import traceback
             traceback.print_exc(file=sys.stderr)
             return f"Error stopping message listening: {str(e)}"
@@ -205,27 +209,27 @@ def register_tools(mcp):
         Returns:
             Formatted list of messages
         """
-        print(f"[DEBUG] meshcore_get_messages called", file=sys.stderr)
-        print(f"[DEBUG] Buffer size: {len(state.message_buffer)}", file=sys.stderr)
-        print(f"[DEBUG] Parameters - limit: {limit}, clear_after_read: {clear_after_read}, message_type: {message_type}", file=sys.stderr)
-        print(f"[DEBUG] Is listening: {state.is_listening}", file=sys.stderr)
+        logger.debug("meshcore_get_messages called")
+        logger.debug(f"Buffer size: {len(state.message_buffer)}")
+        logger.debug(f"Parameters - limit: {limit}, clear_after_read: {clear_after_read}, message_type: {message_type}")
+        logger.debug(f"Is listening: {state.is_listening}")
 
         if not state.message_buffer:
-            print(f"[DEBUG] No messages in buffer", file=sys.stderr)
+            logger.debug("No messages in buffer")
             return "No messages in buffer"
 
         try:
             # Convert deque to list for easier manipulation
             messages = list(state.message_buffer)
-            print(f"[DEBUG] Retrieved {len(messages)} messages from buffer", file=sys.stderr)
+            logger.debug(f"Retrieved {len(messages)} messages from buffer")
 
             # Filter by message type if specified
             if message_type:
                 if message_type not in ["contact", "channel"]:
-                    print(f"[DEBUG] Invalid message_type: {message_type}", file=sys.stderr)
+                    logger.debug(f"Invalid message_type: {message_type}")
                     return "Error: message_type must be 'contact' or 'channel'"
                 messages = [msg for msg in messages if msg.get("type") == message_type]
-                print(f"[DEBUG] Filtered to {len(messages)} {message_type} messages", file=sys.stderr)
+                logger.debug(f"Filtered to {len(messages)} {message_type} messages")
 
             # Reverse to show most recent first
             messages.reverse()
@@ -233,10 +237,10 @@ def register_tools(mcp):
             # Apply limit if specified
             if limit and limit > 0:
                 messages = messages[:limit]
-                print(f"[DEBUG] Limited to {len(messages)} messages", file=sys.stderr)
+                logger.debug(f"Limited to {len(messages)} messages")
 
             if not messages:
-                print(f"[DEBUG] No messages found after filtering", file=sys.stderr)
+                logger.debug("No messages found after filtering")
                 return f"No {message_type + ' ' if message_type else ''}messages found"
 
             # Format output
@@ -271,7 +275,7 @@ def register_tools(mcp):
 
             # Clear buffer if requested
             if clear_after_read:
-                print(f"[DEBUG] Clearing messages from buffer", file=sys.stderr)
+                logger.debug("Clearing messages from buffer")
                 if message_type:
                     # Remove only the filtered messages
                     before_count = len(state.message_buffer)
@@ -279,7 +283,7 @@ def register_tools(mcp):
                         [msg for msg in state.message_buffer if msg.get("type") != message_type],
                         maxlen=1000
                     )
-                    print(f"[DEBUG] Removed {before_count - len(state.message_buffer)} {message_type} messages", file=sys.stderr)
+                    logger.debug(f"Removed {before_count - len(state.message_buffer)} {message_type} messages")
                 elif limit:
                     # Remove the limited number of most recent messages
                     removed = 0
@@ -287,19 +291,19 @@ def register_tools(mcp):
                         if state.message_buffer:
                             state.message_buffer.pop()
                             removed += 1
-                    print(f"[DEBUG] Removed {removed} most recent messages", file=sys.stderr)
+                    logger.debug(f"Removed {removed} most recent messages")
                 else:
                     # Clear all
                     cleared = len(state.message_buffer)
                     state.message_buffer.clear()
-                    print(f"[DEBUG] Cleared all {cleared} messages", file=sys.stderr)
+                    logger.debug(f"Cleared all {cleared} messages")
                 output += "\n(Messages cleared from buffer)\n"
 
-            print(f"[DEBUG] Returning {len(messages)} formatted messages. Buffer size now: {len(state.message_buffer)}", file=sys.stderr)
+            logger.debug(f"Returning {len(messages)} formatted messages. Buffer size now: {len(state.message_buffer)}")
             return output
 
         except Exception as e:
-            print(f"[ERROR] Error retrieving messages: {e}", file=sys.stderr)
+            logger.error(f"Error retrieving messages: {e}")
             import traceback
             traceback.print_exc(file=sys.stderr)
             return f"Error retrieving messages: {str(e)}"
@@ -312,9 +316,9 @@ def register_tools(mcp):
         Returns:
             Status message with number of messages cleared
         """
-        print(f"[DEBUG] meshcore_clear_messages called", file=sys.stderr)
+        logger.debug("meshcore_clear_messages called")
         count = len(state.message_buffer)
-        print(f"[DEBUG] Clearing {count} messages from buffer", file=sys.stderr)
+        logger.debug(f"Clearing {count} messages from buffer")
         state.message_buffer.clear()
-        print(f"[DEBUG] Buffer cleared. New size: {len(state.message_buffer)}", file=sys.stderr)
+        logger.debug(f"Buffer cleared. New size: {len(state.message_buffer)}")
         return f"Cleared {count} message(s) from buffer"
