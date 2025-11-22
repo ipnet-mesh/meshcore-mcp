@@ -8,9 +8,9 @@ version = "0.1.0"
 description = "MCP server for MeshCore companion radio nodes"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = { text = "GPL-3.0-or-later" }
 authors = [
-    { name = "MeshCore MCP", email = "hello@meshcore.dev" }
+    { name = "IPNet", email = "info@ipnt.uk" }
 ]
 dependencies = [
     "mcp>=1.0.0",

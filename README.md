@@ -464,20 +464,11 @@ options:
 
 ## License
 
-MIT License - see LICENSE file for details
+GPL-3.0-or-later - see LICENSE file for details
 
 ## Contributing
 
 Contributions welcome! Please feel free to submit issues or pull requests.
-
-## Future Enhancements
-
-Planned features for future releases:
-- MCP resources for device state
-- Advanced configuration (TX power, device name)
-- Message acknowledgment tracking
-- Authentication/authorization support
-- WebSocket support for real-time push notifications
 
 ## Links
 
