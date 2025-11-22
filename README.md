@@ -7,10 +7,16 @@ An MCP (Model Context Protocol) server that provides tools for interacting with 
 **Core Tools:**
 - `meshcore_connect` - Connect to devices via Serial, BLE, or TCP
 - `meshcore_disconnect` - Cleanly disconnect from devices
-- `meshcore_send_message` - Send messages to contacts
+- `meshcore_send_message` - Send messages to contacts or channels
 - `meshcore_get_contacts` - List all contacts
 - `meshcore_get_device_info` - Query device information
 - `meshcore_get_battery` - Check battery status
+
+**Message Listening Tools:**
+- `meshcore_start_message_listening` - Start receiving incoming messages
+- `meshcore_stop_message_listening` - Stop receiving messages
+- `meshcore_get_messages` - Retrieve received messages from buffer
+- `meshcore_clear_messages` - Clear message buffer
 
 **Transport:**
 - HTTP with Streamable transport (MCP protocol 2025-03-26)
@@ -48,16 +54,36 @@ python -m meshcore_mcp.server
 python -m meshcore_mcp.server --host 0.0.0.0 --port 3000
 ```
 
+**With auto-connect to serial device (recommended):**
+```bash
+python -m meshcore_mcp.server --serial-port /dev/ttyUSB0 --baud-rate 115200
+```
+
+This will connect to the device on startup and fail-fast if the connection fails. Debug mode can be enabled with `--debug`.
+
 **As an installed command:**
 ```bash
-meshcore-mcp --host 0.0.0.0 --port 8080
+meshcore-mcp --serial-port /dev/ttyUSB0 --debug
 ```
 
 The server will print:
 ```
 Starting MeshCore MCP Server on 0.0.0.0:8000
 Server URL: http://0.0.0.0:8000
+[STARTUP] Auto-connect enabled for /dev/ttyUSB0
+[STARTUP] Server starting, connecting to device...
+[STARTUP] Attempting to connect to /dev/ttyUSB0 at 115200 baud...
+[STARTUP] Successfully connected to MeshCore device on /dev/ttyUSB0
+[STARTUP] Device connected. Starting message listening...
+[STARTUP] Subscribed to contact messages
+[STARTUP] Subscribed to channel messages
+[STARTUP] Subscribed to advertisements
+[STARTUP] Auto message fetching started
+[STARTUP] Message listening active with 3 subscriptions
+[STARTUP] Server ready.
 ```
+
+The server automatically subscribes to incoming messages and advertisements, so it's ready to receive and buffer messages immediately.
 
 ### With Claude Desktop
 
@@ -200,6 +226,37 @@ Call `meshcore_get_device_info` to get device name, version, and configuration d
 
 Call `meshcore_get_battery` to get current battery level and status.
 
+### Listening for Messages
+
+**Start listening:**
+```json
+{}
+```
+Call `meshcore_start_message_listening` to start receiving messages. Messages are stored in a buffer (up to 1000 messages).
+
+**Get received messages:**
+```json
+{
+  "limit": 10,
+  "message_type": "contact"
+}
+```
+- `limit`: Optional, number of most recent messages to retrieve
+- `message_type`: Optional, filter by "contact" or "channel"
+- `clear_after_read`: Optional, set to `true` to clear messages after reading
+
+**Stop listening:**
+```json
+{}
+```
+Call `meshcore_stop_message_listening` to stop receiving new messages (buffer is retained).
+
+**Clear message buffer:**
+```json
+{}
+```
+Call `meshcore_clear_messages` to empty the message buffer.
+
 ## Example Conversation with Claude
 
 ```
@@ -221,7 +278,37 @@ Claude: I'll send that message to Bob.
 [Uses meshcore_send_message tool]
 Message sent to Bob: "Meeting at 3pm"
 Result: MSG_SENT
+
+You: Start listening for messages
+
+Claude: I'll start listening for incoming messages.
+[Uses meshcore_start_message_listening tool]
+Started listening for messages. Messages will be buffered and can be retrieved with meshcore_get_messages.
+
+You: Check if I have any messages
+
+Claude: Let me check your messages.
+[Uses meshcore_get_messages tool]
+Messages (2 total):
+============================================================
+
+[1] CONTACT MESSAGE
+  Time: 2025-11-21T10:30:15
+  From: Alice
+  Public Key: a1b2c3
+  Message: Got it, see you at 3!
+------------------------------------------------------------
+
+[2] CHANNEL MESSAGE
+  Time: 2025-11-21T10:32:00
+  From: Bob
+  Public Key: d4e5f6
+  Channel: 0
+  Message: Weather looks good today
+------------------------------------------------------------
 ```
+
+The "Public Key" field is the sender's address and should be used as the destination when replying with meshcore_send_message.
 
 ## Architecture
 
@@ -229,7 +316,9 @@ The server uses **FastMCP** with **Streamable HTTP transport** for web accessibi
 
 **Key Components:**
 - **HTTP Server**: FastMCP with streamable-http transport (MCP 2025-03-26)
-- **Server State**: Global `ServerState` class maintains connection instance
+- **Server State**: Global `ServerState` class maintains connection instance and message buffer
+- **Message Buffer**: Stores up to 1000 received messages with automatic overflow handling
+- **Event Subscriptions**: Real-time message handling via meshcore event system
 - **Tool Decorators**: Each tool uses `@mcp.tool()` for automatic registration
 - **Error Handling**: All commands check for EventType.ERROR responses
 - **Connection Types**: Supports Serial, BLE, and TCP with appropriate validation
@@ -321,14 +410,22 @@ curl -X GET http://localhost:8000/mcp -H "Accept: text/event-stream"
 ## Command-Line Options
 
 ```
-usage: server.py [-h] [--host HOST] [--port PORT]
+usage: server.py [-h] [--host HOST] [--port PORT] [--serial-port SERIAL_PORT]
+                 [--baud-rate BAUD_RATE] [--debug]
 
 MeshCore MCP Server - HTTP/Streamable transport
 
 options:
-  -h, --help   show this help message and exit
-  --host HOST  Host to bind to (default: 0.0.0.0)
-  --port PORT  Port to bind to (default: 8000)
+  -h, --help            show this help message and exit
+  --host HOST           Host to bind to (default: 0.0.0.0)
+  --port PORT           Port to bind to (default: 8000)
+  --serial-port SERIAL_PORT
+                        Serial port to auto-connect on startup (e.g.,
+                        /dev/ttyUSB0). If specified, server will fail-fast if
+                        connection fails.
+  --baud-rate BAUD_RATE
+                        Baud rate for serial connection (default: 115200)
+  --debug               Enable debug mode for MeshCore connection
 ```
 
 ## Dependencies
@@ -357,14 +454,11 @@ Contributions welcome! Please feel free to submit issues or pull requests.
 ## Future Enhancements
 
 Planned features for future releases:
-- Message history and event buffering
 - MCP resources for device state
-- Event subscription tools (real-time message monitoring)
 - Advanced configuration (TX power, device name)
 - Message acknowledgment tracking
-- Auto message fetching/monitoring
 - Authentication/authorization support
-- WebSocket support for real-time updates
+- WebSocket support for real-time push notifications
 
 ## Links
 
