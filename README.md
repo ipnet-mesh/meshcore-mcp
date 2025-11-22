@@ -13,6 +13,11 @@ An MCP (Model Context Protocol) server that provides tools for interacting with 
 - `meshcore_get_device_info` - Query device information
 - `meshcore_get_battery` - Check battery status
 
+**Clock Management Tools:**
+- `meshcore_get_time` - Get current device time
+- `meshcore_set_time` - Set device time to specific Unix timestamp
+- `meshcore_sync_clock` - Sync device clock to system time
+
 **Message Listening Tools:**
 - `meshcore_start_message_listening` - Start receiving incoming messages
 - `meshcore_stop_message_listening` - Stop receiving messages
@@ -62,6 +67,13 @@ python -m meshcore_mcp.server --serial-port /dev/ttyUSB0 --baud-rate 115200
 
 This will connect to the device on startup and fail-fast if the connection fails. Debug mode can be enabled with `--debug`.
 
+**With auto-connect and clock sync (recommended for accurate timestamps):**
+```bash
+python -m meshcore_mcp.server --serial-port /dev/ttyUSB0 --sync-clock-on-startup
+```
+
+This will connect to the device on startup and automatically synchronize the device clock to the system time, ensuring accurate message timestamps.
+
 **As an installed command:**
 ```bash
 meshcore-mcp --serial-port /dev/ttyUSB0 --debug
@@ -75,6 +87,8 @@ Server URL: http://0.0.0.0:8000
 [STARTUP] Server starting, connecting to device...
 [STARTUP] Attempting to connect to /dev/ttyUSB0 at 115200 baud...
 [STARTUP] Successfully connected to MeshCore device on /dev/ttyUSB0
+[STARTUP] Syncing device clock to system time...
+[STARTUP] Clock synced successfully to 2025-11-22 14:30:00
 [STARTUP] Device connected. Starting message listening...
 [STARTUP] Subscribed to contact messages
 [STARTUP] Subscribed to channel messages
@@ -83,6 +97,8 @@ Server URL: http://0.0.0.0:8000
 [STARTUP] Message listening active with 3 subscriptions
 [STARTUP] Server ready.
 ```
+
+(Clock sync messages only appear when using `--sync-clock-on-startup`)
 
 The server automatically subscribes to incoming messages and advertisements, so it's ready to receive and buffer messages immediately.
 
@@ -245,6 +261,28 @@ Call `meshcore_get_device_info` to get device name, version, and configuration d
 
 Call `meshcore_get_battery` to get current battery level and status.
 
+### Managing Device Clock
+
+**Get device time:**
+```json
+{}
+```
+Call `meshcore_get_time` to retrieve the current time from the device.
+
+**Sync clock to system time:**
+```json
+{}
+```
+Call `meshcore_sync_clock` to synchronize the device clock with the current system time. This is the easiest way to ensure accurate timestamps.
+
+**Set specific time:**
+```json
+{
+  "timestamp": 1732276800
+}
+```
+Call `meshcore_set_time` to set the device clock to a specific Unix timestamp (seconds since epoch).
+
 ### Listening for Messages
 
 **Start listening:**
@@ -290,6 +328,14 @@ You: What's my battery level?
 Claude: Let me check your battery status.
 [Uses meshcore_get_battery tool]
 Battery Level: 85%
+
+You: Sync the device clock
+
+Claude: I'll synchronize the device clock with the current system time.
+[Uses meshcore_sync_clock tool]
+Device clock synchronized successfully!
+  System Time: 2025-11-22 14:30:00
+  Unix Timestamp: 1732285800
 
 You: Send a message to Bob saying "Meeting at 3pm"
 

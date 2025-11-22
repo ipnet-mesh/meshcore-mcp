@@ -730,7 +730,118 @@ async def meshcore_clear_messages() -> str:
     return f"Cleared {count} message(s) from buffer"
 
 
-async def startup_connect(serial_port: str, baud_rate: int, debug: bool) -> bool:
+@mcp.tool()
+async def meshcore_get_time() -> str:
+    """
+    Get the current time from the MeshCore device.
+
+    Returns:
+        Device time information including Unix timestamp and formatted datetime
+    """
+    # Ensure connected (auto-reconnect if needed)
+    error = await ensure_connected()
+    if error:
+        return error
+
+    try:
+        result = await state.meshcore.commands.get_time()
+
+        if result.type == EventType.ERROR:
+            return f"Get time failed: {result.payload}"
+
+        # The payload should contain the Unix timestamp
+        timestamp = result.payload
+
+        # Format the response
+        if isinstance(timestamp, int):
+            # Convert Unix timestamp to human-readable format
+            dt = datetime.fromtimestamp(timestamp)
+            output = "Device Time:\n"
+            output += f"  Unix Timestamp: {timestamp}\n"
+            output += f"  Formatted: {dt.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            output += f"  ISO Format: {dt.isoformat()}\n"
+        else:
+            output = f"Device Time: {timestamp}"
+
+        return output
+
+    except Exception as e:
+        return f"Get time failed: {str(e)}"
+
+
+@mcp.tool()
+async def meshcore_set_time(timestamp: int) -> str:
+    """
+    Set the device time to a specific Unix timestamp.
+
+    Args:
+        timestamp: Unix timestamp (seconds since epoch, e.g., 1732276800)
+
+    Returns:
+        Status message indicating success or failure
+
+    Example:
+        - Set to specific time: timestamp=1732276800 (Nov 22, 2024 12:00:00 UTC)
+    """
+    # Ensure connected (auto-reconnect if needed)
+    error = await ensure_connected()
+    if error:
+        return error
+
+    try:
+        # Validate timestamp
+        if timestamp < 0:
+            return "Error: Timestamp must be a positive integer"
+
+        # Convert timestamp to datetime for display
+        dt = datetime.fromtimestamp(timestamp)
+
+        result = await state.meshcore.commands.set_time(timestamp)
+
+        if result.type == EventType.ERROR:
+            return f"Set time failed: {result.payload}"
+
+        return f"Device time set successfully to:\n  Unix Timestamp: {timestamp}\n  Datetime: {dt.strftime('%Y-%m-%d %H:%M:%S')}\n  ISO Format: {dt.isoformat()}"
+
+    except Exception as e:
+        return f"Set time failed: {str(e)}"
+
+
+@mcp.tool()
+async def meshcore_sync_clock() -> str:
+    """
+    Synchronize the device clock to the current system time.
+
+    This is a convenience function that gets the current system time and
+    sets the device clock to match it.
+
+    Returns:
+        Status message with synchronization details
+    """
+    # Ensure connected (auto-reconnect if needed)
+    error = await ensure_connected()
+    if error:
+        return error
+
+    try:
+        # Get current system time as Unix timestamp
+        import time
+        current_time = int(time.time())
+        dt = datetime.fromtimestamp(current_time)
+
+        # Set device time
+        result = await state.meshcore.commands.set_time(current_time)
+
+        if result.type == EventType.ERROR:
+            return f"Clock sync failed: {result.payload}"
+
+        return f"Device clock synchronized successfully!\n  System Time: {dt.strftime('%Y-%m-%d %H:%M:%S')}\n  Unix Timestamp: {current_time}\n  ISO Format: {dt.isoformat()}"
+
+    except Exception as e:
+        return f"Clock sync failed: {str(e)}"
+
+
+async def startup_connect(serial_port: str, baud_rate: int, debug: bool, sync_clock: bool = False) -> bool:
     """
     Connect to MeshCore device on startup.
 
@@ -738,6 +849,7 @@ async def startup_connect(serial_port: str, baud_rate: int, debug: bool) -> bool
         serial_port: Serial port path
         baud_rate: Baud rate for connection
         debug: Enable debug mode
+        sync_clock: Sync device clock to system time after connecting
 
     Returns:
         True if connected successfully, False otherwise
@@ -752,6 +864,26 @@ async def startup_connect(serial_port: str, baud_rate: int, debug: bool) -> bool
 
         print(f"[STARTUP] Successfully connected to MeshCore device on {serial_port}", file=sys.stderr)
         print(f"[STARTUP] Connection state - Type: {state.connection_type}, Debug: {state.debug}", file=sys.stderr)
+
+        # Sync clock if requested
+        if sync_clock:
+            print(f"[STARTUP] Syncing device clock to system time...", file=sys.stderr)
+            try:
+                import time
+                current_time = int(time.time())
+                dt = datetime.fromtimestamp(current_time)
+
+                result = await state.meshcore.commands.set_time(current_time)
+
+                if result.type == EventType.ERROR:
+                    print(f"[STARTUP] WARNING: Clock sync failed: {result.payload}", file=sys.stderr)
+                else:
+                    print(f"[STARTUP] Clock synced successfully to {dt.strftime('%Y-%m-%d %H:%M:%S')}", file=sys.stderr)
+            except Exception as e:
+                print(f"[STARTUP] WARNING: Clock sync failed: {e}", file=sys.stderr)
+                import traceback
+                traceback.print_exc(file=sys.stderr)
+
         return True
 
     except Exception as e:
@@ -793,6 +925,11 @@ def parse_args():
         "--debug",
         action="store_true",
         help="Enable debug mode for MeshCore connection"
+    )
+    parser.add_argument(
+        "--sync-clock-on-startup",
+        action="store_true",
+        help="Automatically sync device clock to system time on startup (requires --serial-port)"
     )
     return parser.parse_args()
 
@@ -837,7 +974,7 @@ def main():
             async with original_lifespan(app):
                 # Now run our custom startup
                 print(f"[STARTUP] Server starting, connecting to device...", file=sys.stderr)
-                connected = await startup_connect(args.serial_port, args.baud_rate, args.debug)
+                connected = await startup_connect(args.serial_port, args.baud_rate, args.debug, args.sync_clock_on_startup)
 
                 if not connected:
                     print(f"[STARTUP] FATAL: Failed to connect to {args.serial_port}", file=sys.stderr)
