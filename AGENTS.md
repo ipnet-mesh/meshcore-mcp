@@ -2,9 +2,32 @@
 
 This document provides instructions for AI coding assistants working with this repository.
 
-## ⚠️ CRITICAL: Virtual Environment Setup
+## Quick Start for Testing/Running
 
-**BEFORE ANY OTHER ACTIONS**, you must create and activate a virtual environment:
+### Recommended: Docker
+
+For quick testing or running the server, use Docker:
+
+```bash
+# Basic usage
+docker run -d -p 8000:8000 ghcr.io/ipnet-mesh/meshcore-mcp:main
+
+# With serial device access
+docker run -d -p 8000:8000 --device=/dev/ttyUSB0 \
+  ghcr.io/ipnet-mesh/meshcore-mcp:main \
+  --serial-port /dev/ttyUSB0 --sync-clock-on-startup
+
+# Build locally
+docker build -t meshcore-mcp:local .
+```
+
+**Available images:**
+- `ghcr.io/ipnet-mesh/meshcore-mcp:main` - Latest development
+- `ghcr.io/ipnet-mesh/meshcore-mcp:latest` - Latest stable release
+
+### For Development: Virtual Environment Setup
+
+**WHEN MODIFYING CODE**, you must create and activate a virtual environment:
 
 ```bash
 # Create virtual environment in ./.venv
@@ -16,7 +39,7 @@ source .venv/bin/activate  # Linux/macOS
 .venv\Scripts\activate     # Windows
 ```
 
-**All subsequent commands (pip install, pytest, python -m, etc.) MUST be run within the activated virtual environment.**
+**All subsequent development commands (pip install, pytest, python -m, etc.) MUST be run within the activated virtual environment.**
 
 ## Project Overview
 
@@ -42,7 +65,25 @@ pip install -e ".[dev]"
 
 ### 1. Running the Server
 
+**With Docker (recommended for testing):**
 ```bash
+# Using public image
+docker run -p 8000:8000 ghcr.io/ipnet-mesh/meshcore-mcp:main
+
+# Build and run locally
+docker build -t meshcore-mcp:local .
+docker run -p 8000:8000 meshcore-mcp:local
+
+# With device access
+docker run -p 8000:8000 --device=/dev/ttyUSB0 \
+  meshcore-mcp:local --serial-port /dev/ttyUSB0
+```
+
+**With Python (for code development):**
+```bash
+# Activate virtual environment first
+source .venv/bin/activate
+
 # Default (localhost:8000)
 python -m meshcore_mcp.server
 
@@ -53,11 +94,13 @@ python -m meshcore_mcp.server --host 0.0.0.0 --port 3000
 ### 2. Testing
 
 ```bash
+# Activate virtual environment first
+source .venv/bin/activate
+
 # Run tests (if configured)
 pytest
 
-# Manual testing with curl
-curl -X POST http://localhost:8000/mcp/v1/tools/list
+# Manual testing with MCP clients (see README.md)
 ```
 
 ### 3. Code Structure

@@ -8,15 +8,38 @@ This file contains all the necessary guidelines for AI coding assistants, includ
 
 ## Key Reminders
 
-1. **Always create and activate the virtual environment first** (see @AGENTS.md)
-2. Review the available MCP tools before suggesting changes
-3. Maintain consistency with existing code patterns
-4. Test changes when possible
-5. Update documentation if behavior changes
+1. **For users**: Recommend Docker first (see Quick Reference below)
+2. **For development**: Create and activate virtual environment (see @AGENTS.md)
+3. Review the available MCP tools before suggesting changes
+4. Maintain consistency with existing code patterns
+5. Test changes when possible
+6. Update documentation if behavior changes
 
 ## Quick Reference
 
-- **Server Start**: `python -m meshcore_mcp.server`
+### Running the Server (Production/Users)
+
+**Recommended - Docker:**
+```bash
+# Basic
+docker run -d -p 8000:8000 ghcr.io/ipnet-mesh/meshcore-mcp:main
+
+# With serial device
+docker run -d -p 8000:8000 --device=/dev/ttyUSB0 \
+  ghcr.io/ipnet-mesh/meshcore-mcp:main \
+  --serial-port /dev/ttyUSB0 --sync-clock-on-startup
+```
+
+**Local development:**
+```bash
+source .venv/bin/activate  # After creating venv
+python -m meshcore_mcp.server
+```
+
+### Key Files
+
+- **User Docs**: `README.md` - Start here for Docker setup
+- **Agent Docs**: `AGENTS.md` - Development workflow
 - **Main Code**: `src/meshcore_mcp/server.py`
+- **Docker**: `Dockerfile`
 - **Dependencies**: `pyproject.toml`
-- **User Docs**: `README.md`

@@ -29,7 +29,61 @@ An MCP (Model Context Protocol) server that provides tools for interacting with 
 - Web-accessible for browser clients and agents
 - Configurable host/port binding
 
-## Installation
+## Quick Start with Docker (Recommended)
+
+The easiest way to run MeshCore MCP Server is using our official Docker image:
+
+```bash
+# Basic usage (port 8000)
+docker run -d \
+  --name meshcore-mcp \
+  -p 8000:8000 \
+  ghcr.io/ipnet-mesh/meshcore-mcp:main
+
+# With serial device access (Linux)
+docker run -d \
+  --name meshcore-mcp \
+  -p 8000:8000 \
+  --device=/dev/ttyUSB0 \
+  ghcr.io/ipnet-mesh/meshcore-mcp:main \
+  --serial-port /dev/ttyUSB0 --baud-rate 115200
+
+# With auto-connect and clock sync (recommended)
+docker run -d \
+  --name meshcore-mcp \
+  -p 8000:8000 \
+  --device=/dev/ttyUSB0 \
+  ghcr.io/ipnet-mesh/meshcore-mcp:main \
+  --serial-port /dev/ttyUSB0 --sync-clock-on-startup
+
+# Custom port
+docker run -d \
+  --name meshcore-mcp \
+  -p 3000:8000 \
+  ghcr.io/ipnet-mesh/meshcore-mcp:main
+```
+
+**Available tags:**
+- `main` - Latest development build
+- `latest` - Latest stable release
+- `vX.Y.Z` - Specific version tags
+
+**Docker Compose example:**
+
+```yaml
+version: '3.8'
+services:
+  meshcore-mcp:
+    image: ghcr.io/ipnet-mesh/meshcore-mcp:main
+    ports:
+      - "8000:8000"
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+    command: ["--serial-port", "/dev/ttyUSB0", "--sync-clock-on-startup"]
+    restart: unless-stopped
+```
+
+## Installation from Source
 
 ### Prerequisites
 - Python 3.10 or higher
@@ -42,6 +96,12 @@ An MCP (Model Context Protocol) server that provides tools for interacting with 
 git clone https://github.com/ipnet-mesh/meshcore-mcp.git
 cd meshcore-mcp
 
+# Create and activate virtual environment
+python3 -m venv .venv
+source .venv/bin/activate  # Linux/macOS
+# OR
+.venv\Scripts\activate     # Windows
+
 # Install dependencies
 pip install -e .
 ```
@@ -49,6 +109,11 @@ pip install -e .
 ## Usage
 
 ### Starting the HTTP Server
+
+**With Docker (recommended):**
+See [Quick Start with Docker](#quick-start-with-docker-recommended) section above.
+
+**With Python (local development):**
 
 **Default (localhost:8000):**
 ```bash
@@ -396,6 +461,20 @@ The server uses **FastMCP** with **Streamable HTTP transport** for web accessibi
 
 ## Development
 
+### Building the Docker Image
+
+```bash
+# Build locally
+docker build -t meshcore-mcp:local .
+
+# Run your local build
+docker run -p 8000:8000 meshcore-mcp:local
+
+# With device access
+docker run -p 8000:8000 --device=/dev/ttyUSB0 meshcore-mcp:local \
+  --serial-port /dev/ttyUSB0
+```
+
 ### Project Structure
 
 ```
@@ -406,6 +485,7 @@ meshcore-mcp/
 │       └── server.py          # FastMCP HTTP server
 ├── examples/
 │   └── claude_desktop_config.json
+├── Dockerfile                  # Docker image definition
 ├── pyproject.toml
 ├── README.md
 └── LICENSE
@@ -414,14 +494,29 @@ meshcore-mcp/
 ### Running Tests
 
 ```bash
+# Activate virtual environment first
+source .venv/bin/activate
+
+# Install dev dependencies
 pip install -e ".[dev]"
+
+# Run tests
 pytest
 ```
 
 ### Testing the Server
 
-Start the server:
+**With Docker:**
 ```bash
+docker run -p 8000:8000 ghcr.io/ipnet-mesh/meshcore-mcp:main
+```
+
+**With Python (local development):**
+```bash
+# Activate virtual environment first
+source .venv/bin/activate
+
+# Start the server
 python -m meshcore_mcp.server --port 8000
 ```
 
