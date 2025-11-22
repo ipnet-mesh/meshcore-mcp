@@ -24,3 +24,5 @@ EXPOSE 8000
 # Default command (can be overridden)
 ENTRYPOINT ["python", "-m", "meshcore_mcp.server"]
 CMD ["--host", "0.0.0.0", "--port", "8000"]
+
+LABEL org.opencontainers.image.source="https://github.com/ipnet-mesh/meshcore-mcp"
