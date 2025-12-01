@@ -1,55 +1,17 @@
 # MeshCore MCP Server
 
-An MCP (Model Context Protocol) server that provides tools for interacting with MeshCore companion radio nodes via HTTP. This enables AI assistants and web-based tools to control and communicate with mesh network devices.
-
-## Example Usage
-
-Here's a real conversation with Claude using the MeshCore MCP server:
-
-👤 **User:** Are you connected to MeshCore?
-
-🤖 **Claude:** Yes, I am connected to MeshCore. I can see the device information showing a **Heltec V3** device running firmware version **8 (v1.10.0-9405e8b)** built on November 13, 2025. The device supports up to 350 contacts and 40 channels.
-
-👤 **User:** Do I have any messages?
-
-🤖 **Claude:** No, you don't have any messages. Your message buffer is currently empty.
-
-👤 **User:** Someone has sent a message. Can you check again?
-
-🤖 **Claude:** You're right! You do have a message now. There's **1 message** in your buffer:
-
-**Message Details:**
-- **From:** Unknown (Public Key: `2369759a4926`)
-- **Time:** November 22, 2025 at 13:46:24
-- **Message:** "Hello GitHub!"
-
-It appears to be from an unknown contact, but you can see their public key identifier.
-
-👤 **User:** Reply to that message saying "Hello World!"
-
-🤖 **Claude:** I've successfully sent your reply! The message **"Hello World!"** has been sent to contact `2369759a4926`. The system confirms the message was sent successfully.
+An MCP (Model Context Protocol) server that provides tools for interacting with the MeshCore API via HTTP. This enables AI assistants and web-based tools to query and send messages and advertisements on mesh networks.
 
 ## Features
 
-**Core Tools:**
-- `meshcore_connect` - Connect to devices via Serial, BLE, or TCP
-- `meshcore_disconnect` - Cleanly disconnect from devices
-- `meshcore_send_message` - Send messages to contacts or channels
-- `meshcore_send_advert` - Send advertisements to announce device presence
-- `meshcore_get_contacts` - List all contacts
-- `meshcore_get_device_info` - Query device information
-- `meshcore_get_battery` - Check battery status
+**Message Tools:**
+- `meshcore_get_messages` - Query messages with filters (sender, channel, type, date range)
+- `meshcore_send_direct_message` - Send a direct message to a specific node
+- `meshcore_send_channel_message` - Broadcast a message to the channel
 
-**Clock Management Tools:**
-- `meshcore_get_time` - Get current device time
-- `meshcore_set_time` - Set device time to specific Unix timestamp
-- `meshcore_sync_clock` - Sync device clock to system time
-
-**Message Listening Tools:**
-- `meshcore_start_message_listening` - Start receiving incoming messages
-- `meshcore_stop_message_listening` - Stop receiving messages
-- `meshcore_get_messages` - Retrieve received messages from buffer
-- `meshcore_clear_messages` - Clear message buffer
+**Advertisement Tools:**
+- `meshcore_get_advertisements` - Query advertisements with filters (node, type, date range)
+- `meshcore_send_advertisement` - Send an advertisement to announce presence on the network
 
 **Transport:**
 - HTTP with Streamable transport (MCP protocol 2025-03-26)
@@ -65,29 +27,17 @@ The easiest way to run MeshCore MCP Server is using our official Docker image:
 docker run -d \
   --name meshcore-mcp \
   -p 8000:8000 \
+  -e MESHCORE_API_URL=http://your-meshcore-api:9000 \
+  -e MESHCORE_API_TOKEN=your-api-token \
   ghcr.io/ipnet-mesh/meshcore-mcp:main
 
-# With serial device access (Linux)
+# Or with command-line arguments
 docker run -d \
   --name meshcore-mcp \
   -p 8000:8000 \
-  --device=/dev/ttyUSB0 \
   ghcr.io/ipnet-mesh/meshcore-mcp:main \
-  --serial-port /dev/ttyUSB0 --baud-rate 115200
-
-# With auto-connect and clock sync (recommended)
-docker run -d \
-  --name meshcore-mcp \
-  -p 8000:8000 \
-  --device=/dev/ttyUSB0 \
-  ghcr.io/ipnet-mesh/meshcore-mcp:main \
-  --serial-port /dev/ttyUSB0 --sync-clock-on-startup
-
-# Custom port
-docker run -d \
-  --name meshcore-mcp \
-  -p 3000:8000 \
-  ghcr.io/ipnet-mesh/meshcore-mcp:main
+  --api-url http://your-meshcore-api:9000 \
+  --api-token your-api-token
 ```
 
 **Available tags:**
@@ -104,9 +54,9 @@ services:
     image: ghcr.io/ipnet-mesh/meshcore-mcp:main
     ports:
       - "8000:8000"
-    devices:
-      - /dev/ttyUSB0:/dev/ttyUSB0
-    command: ["--serial-port", "/dev/ttyUSB0", "--sync-clock-on-startup"]
+    environment:
+      - MESHCORE_API_URL=http://meshcore-api:9000
+      - MESHCORE_API_TOKEN=your-api-token
     restart: unless-stopped
 ```
 
@@ -114,7 +64,7 @@ services:
 
 ### Prerequisites
 - Python 3.10 or higher
-- A MeshCore-compatible device (connected via Serial/BLE/TCP)
+- Access to a MeshCore API server
 
 ### Install from source
 
@@ -133,66 +83,50 @@ source .venv/bin/activate  # Linux/macOS
 pip install -e .
 ```
 
+## Configuration
+
+The server requires connection to a MeshCore API server. Configure via environment variables or command-line arguments:
+
+**Environment Variables:**
+- `MESHCORE_API_URL` - Base URL for the MeshCore API (e.g., `http://localhost:9000`)
+- `MESHCORE_API_TOKEN` - Bearer token for API authentication (optional if API is public)
+
+**Command-Line Arguments:**
+- `--api-url` - MeshCore API URL
+- `--api-token` - API bearer token
+
 ## Usage
 
 ### Starting the HTTP Server
 
-**With Docker (recommended):**
-See [Quick Start with Docker](#quick-start-with-docker-recommended) section above.
-
-**With Python (local development):**
-
 **Default (localhost:8000):**
 ```bash
-python -m meshcore_mcp.server
+python -m meshcore_mcp.server --api-url http://localhost:9000
 ```
 
 **Custom host/port:**
 ```bash
-python -m meshcore_mcp.server --host 0.0.0.0 --port 3000
+python -m meshcore_mcp.server --host 0.0.0.0 --port 3000 --api-url http://localhost:9000
 ```
 
-**With auto-connect to serial device (recommended):**
+**With authentication:**
 ```bash
-python -m meshcore_mcp.server --serial-port /dev/ttyUSB0 --baud-rate 115200
+python -m meshcore_mcp.server --api-url http://localhost:9000 --api-token your-secret-token
 ```
-
-This will connect to the device on startup and fail-fast if the connection fails. Debug mode can be enabled with `--debug`.
-
-**With auto-connect and clock sync (recommended for accurate timestamps):**
-```bash
-python -m meshcore_mcp.server --serial-port /dev/ttyUSB0 --sync-clock-on-startup
-```
-
-This will connect to the device on startup and automatically synchronize the device clock to the system time, ensuring accurate message timestamps.
 
 **As an installed command:**
 ```bash
-meshcore-mcp --serial-port /dev/ttyUSB0 --debug
+meshcore-mcp --api-url http://localhost:9000
 ```
 
 The server will print:
 ```
+API URL configured: http://localhost:9000
+API token configured (authentication enabled)
 Starting MeshCore MCP Server on 0.0.0.0:8000
 Server URL: http://0.0.0.0:8000
-[STARTUP] Auto-connect enabled for /dev/ttyUSB0
-[STARTUP] Server starting, connecting to device...
-[STARTUP] Attempting to connect to /dev/ttyUSB0 at 115200 baud...
-[STARTUP] Successfully connected to MeshCore device on /dev/ttyUSB0
-[STARTUP] Syncing device clock to system time...
-[STARTUP] Clock synced successfully to 2025-11-22 14:30:00
-[STARTUP] Device connected. Starting message listening...
-[STARTUP] Subscribed to contact messages
-[STARTUP] Subscribed to channel messages
-[STARTUP] Subscribed to advertisements
-[STARTUP] Auto message fetching started
-[STARTUP] Message listening active with 3 subscriptions
-[STARTUP] Server ready.
+Server ready.
 ```
-
-(Clock sync messages only appear when using `--sync-clock-on-startup`)
-
-The server automatically subscribes to incoming messages and advertisements, so it's ready to receive and buffer messages immediately.
 
 ### With Claude Desktop
 
@@ -212,22 +146,9 @@ Add this configuration to your Claude Desktop config file:
 }
 ```
 
-For remote servers:
-```json
-{
-  "mcpServers": {
-    "meshcore": {
-      "url": "http://your-server-ip:8000"
-    }
-  }
-}
-```
-
 ### With OpenWebUI
 
 OpenWebUI uses [MCPO](https://github.com/open-webui/mcpo) (MCP-to-OpenAPI proxy) to connect to MCP servers. Configure MCPO with:
-
-**1. Create a `config.json` file:**
 
 ```json
 {
@@ -240,249 +161,104 @@ OpenWebUI uses [MCPO](https://github.com/open-webui/mcpo) (MCP-to-OpenAPI proxy)
 }
 ```
 
-_See `examples/mcpo_config.json` for a complete example._
-
-For remote servers:
-```json
-{
-  "mcpServers": {
-    "meshcore": {
-      "type": "streamable-http",
-      "url": "http://your-server-ip:8000/mcp"
-    }
-  }
-}
-```
-
-**2. Run MCPO with Docker:**
-
-```bash
-# Note: MCPO runs on port 8080 to avoid conflict with the MCP server on 8000
-docker run -d \
-  --name mcpo \
-  -p 8080:8000 \
-  -v $(pwd)/config.json:/app/config/config.json \
-  ghcr.io/open-webui/mcpo:main
-```
-
-**Important:** The MCP server runs on port 8000, while MCPO is exposed on port 8080 to avoid conflicts. Adjust ports as needed for your environment.
-
-**3. Configure OpenWebUI:**
-
-In OpenWebUI settings, add the MCPO endpoint as an OpenAPI server. The tools will then be available to your AI models.
-
-**See also:** [OpenWebUI MCP Documentation](https://docs.openwebui.com/features/mcp/) and [MCPO GitHub](https://github.com/open-webui/mcpo)
-
-### With Other MCP Clients
-
-The HTTP server is compatible with any MCP client that supports the Streamable HTTP transport (MCP protocol 2025-03-26).
-
-**Server endpoint:** `http://localhost:8000/mcp`
-
-**Note:** The MCP endpoint requires proper MCP protocol handshaking with session management. Use an MCP-compatible client library (like the official MCP SDK) or a proxy like MCPO for integration with non-MCP tools.
-
 ## Tool Examples
 
-### Connecting to a Device
+### Querying Messages
 
-**Serial Connection:**
 ```json
 {
-  "type": "serial",
-  "port": "/dev/ttyUSB0",
-  "baud_rate": 115200,
-  "debug": true
+  "sender_public_key": "abc123...64chars",
+  "message_type": "contact",
+  "limit": 50
 }
 ```
 
-**BLE Connection:**
-```json
-{
-  "type": "ble",
-  "address": "12:34:56:78:90:AB",
-  "pin": "123456"
-}
-```
-
-**TCP Connection:**
-```json
-{
-  "type": "tcp",
-  "host": "192.168.1.100",
-  "port": "4000",
-  "auto_reconnect": true
-}
-```
-
-### Sending a Message
+### Sending a Direct Message
 
 ```json
 {
-  "destination": "Alice",
+  "destination": "abc123...64chars",
   "text": "Hello from MCP!"
+}
+```
+
+Note: The destination must be a full 64-character public key.
+
+### Sending a Channel Message
+
+```json
+{
+  "text": "Hello everyone!",
+  "flood": true
+}
+```
+
+### Querying Advertisements
+
+```json
+{
+  "adv_type": "chat",
+  "limit": 100
 }
 ```
 
 ### Sending an Advertisement
 
-**Zero-hop advertisement (immediate neighbors only):**
 ```json
 {
   "flood": false
 }
 ```
 
-**Flooded advertisement (multi-hop via repeaters):**
-```json
-{
-  "flood": true
-}
-```
-
-Advertisements announce your device's presence to the mesh network. Use `flood: false` for zero-hop broadcasts to immediate neighbors, or `flood: true` for multi-hop broadcasts that are repeated by all network repeaters.
-
-### Getting Contacts
-
-Call `meshcore_get_contacts` with no parameters to retrieve your contact list.
-
-### Querying Device Info
-
-Call `meshcore_get_device_info` to get device name, version, and configuration details.
-
-### Checking Battery
-
-Call `meshcore_get_battery` to get current battery level and status.
-
-### Managing Device Clock
-
-**Get device time:**
-```json
-{}
-```
-Call `meshcore_get_time` to retrieve the current time from the device.
-
-**Sync clock to system time:**
-```json
-{}
-```
-Call `meshcore_sync_clock` to synchronize the device clock with the current system time. This is the easiest way to ensure accurate timestamps.
-
-**Set specific time:**
-```json
-{
-  "timestamp": 1732276800
-}
-```
-Call `meshcore_set_time` to set the device clock to a specific Unix timestamp (seconds since epoch).
-
-### Listening for Messages
-
-**Start listening:**
-```json
-{}
-```
-Call `meshcore_start_message_listening` to start receiving messages. Messages are stored in a buffer (up to 1000 messages).
-
-**Get received messages:**
-```json
-{
-  "limit": 10,
-  "message_type": "contact"
-}
-```
-- `limit`: Optional, number of most recent messages to retrieve
-- `message_type`: Optional, filter by "contact" or "channel"
-- `clear_after_read`: Optional, set to `true` to clear messages after reading
-
-**Stop listening:**
-```json
-{}
-```
-Call `meshcore_stop_message_listening` to stop receiving new messages (buffer is retained).
-
-**Clear message buffer:**
-```json
-{}
-```
-Call `meshcore_clear_messages` to empty the message buffer.
+Use `flood: false` for zero-hop broadcasts to immediate neighbors, or `flood: true` for multi-hop broadcasts.
 
 ## Example Conversation with Claude
 
 ```
-You: Connect to my MeshCore device on /dev/ttyUSB0
+You: Show me the recent messages on the network
 
-Claude: I'll connect to your MeshCore device.
-[Uses meshcore_connect tool]
-Successfully connected to MeshCore device via serial
-
-You: What's my battery level?
-
-Claude: Let me check your battery status.
-[Uses meshcore_get_battery tool]
-Battery Level: 85%
-
-You: Sync the device clock
-
-Claude: I'll synchronize the device clock with the current system time.
-[Uses meshcore_sync_clock tool]
-Device clock synchronized successfully!
-  System Time: 2025-11-22 14:30:00
-  Unix Timestamp: 1732285800
-
-You: Send a message to Bob saying "Meeting at 3pm"
-
-Claude: I'll send that message to Bob.
-[Uses meshcore_send_message tool]
-Message sent to Bob: "Meeting at 3pm"
-Result: MSG_SENT
-
-You: Start listening for messages
-
-Claude: I'll start listening for incoming messages.
-[Uses meshcore_start_message_listening tool]
-Started listening for messages. Messages will be buffered and can be retrieved with meshcore_get_messages.
-
-You: Check if I have any messages
-
-Claude: Let me check your messages.
+Claude: Let me query the recent messages.
 [Uses meshcore_get_messages tool]
-Messages (2 total):
+Messages (3 of 15 total):
 ============================================================
 
-[1] CONTACT MESSAGE
-  Time: 2025-11-21T10:30:15
-  From: Alice
-  Public Key: a1b2c3
-  Message: Got it, see you at 3!
-------------------------------------------------------------
+[1] CONTACT MESSAGE (received)
+  ID: 42
+  Sender Key: a1b2c3d4...
+  Content: Hello everyone!
+  SNR: -5.5 dB
+  Path Length: 2 hops
+  Received: 2025-11-22T14:30:00
 
-[2] CHANNEL MESSAGE
-  Time: 2025-11-21T10:32:00
-  From: Bob
-  Public Key: d4e5f6
+[2] CHANNEL MESSAGE (received)
+  ID: 41
   Channel: 0
-  Message: Weather looks good today
-------------------------------------------------------------
-```
+  Content: Weather update: Clear skies
+  Received: 2025-11-22T14:25:00
+...
 
-The "Public Key" field is the sender's address and should be used as the destination when replying with meshcore_send_message.
+You: Send a message to node a1b2c3d4... saying "Got your message!"
+
+Claude: I'll send that direct message.
+[Uses meshcore_send_direct_message tool]
+Direct message send succeeded: Message queued for delivery
+  Queue position: 1
+  Estimated wait: 0.5s
+```
 
 ## Architecture
 
-The server uses **FastMCP** with **Streamable HTTP transport** for web accessibility. Connection state is managed globally, and all tools validate connectivity before executing commands.
+The server uses **FastMCP** with **Streamable HTTP transport** for web accessibility. It acts as a client to the MeshCore API, translating MCP tool calls into HTTP requests.
 
 **Key Components:**
 - **HTTP Server**: FastMCP with streamable-http transport (MCP 2025-03-26)
-- **Server State**: Global `ServerState` class maintains connection instance and message buffer
-- **Message Buffer**: Stores up to 1000 received messages with automatic overflow handling
-- **Event Subscriptions**: Real-time message handling via meshcore event system
+- **API Client**: httpx-based async client for MeshCore API
+- **Server State**: Configuration for API URL and authentication
 - **Tool Decorators**: Each tool uses `@mcp.tool()` for automatic registration
-- **Error Handling**: All commands check for EventType.ERROR responses
-- **Connection Types**: Supports Serial, BLE, and TCP with appropriate validation
 
 **Why HTTP?**
 - **Web Accessible**: Compatible with browser-based clients and agents
-- **Stateless Options**: Can be scaled horizontally if needed
+- **Stateless**: Can be scaled horizontally
 - **Remote Access**: Connect from anywhere on the network
 - **Standard Protocol**: Uses MCP Streamable HTTP (latest standard)
 
@@ -495,11 +271,7 @@ The server uses **FastMCP** with **Streamable HTTP transport** for web accessibi
 docker build -t meshcore-mcp:local .
 
 # Run your local build
-docker run -p 8000:8000 meshcore-mcp:local
-
-# With device access
-docker run -p 8000:8000 --device=/dev/ttyUSB0 meshcore-mcp:local \
-  --serial-port /dev/ttyUSB0
+docker run -p 8000:8000 -e MESHCORE_API_URL=http://localhost:9000 meshcore-mcp:local
 ```
 
 ### Project Structure
@@ -509,10 +281,16 @@ meshcore-mcp/
 ├── src/
 │   └── meshcore_mcp/
 │       ├── __init__.py
-│       └── server.py          # FastMCP HTTP server
-├── examples/
-│   └── claude_desktop_config.json
-├── Dockerfile                  # Docker image definition
+│       ├── server.py          # FastMCP HTTP server
+│       ├── state.py           # Configuration state
+│       ├── client.py          # API HTTP client
+│       └── tools/
+│           ├── __init__.py
+│           ├── messages.py    # Message tools
+│           └── advertisements.py  # Advertisement tools
+├── specs/
+│   └── openapi.json           # MeshCore API spec
+├── Dockerfile
 ├── pyproject.toml
 ├── README.md
 └── LICENSE
@@ -531,74 +309,11 @@ pip install -e ".[dev]"
 pytest
 ```
 
-### Testing the Server
-
-**With Docker:**
-```bash
-docker run -p 8000:8000 ghcr.io/ipnet-mesh/meshcore-mcp:main
-```
-
-**With Python (local development):**
-```bash
-# Activate virtual environment first
-source .venv/bin/activate
-
-# Start the server
-python -m meshcore_mcp.server --port 8000
-```
-
-**Testing with MCP Clients:**
-
-The server uses MCP Streamable HTTP protocol and requires proper MCP client libraries for testing. Direct curl testing is not recommended due to session management requirements.
-
-For testing, use:
-- **Claude Desktop** with the configuration shown above
-- **MCPO** to expose as OpenAPI (see OpenWebUI section)
-- **MCP SDK** client libraries in your preferred language
-
-**Quick verification that server is running:**
-```bash
-# This should return an error about missing session ID (which confirms the MCP endpoint is active)
-curl -X GET http://localhost:8000/mcp -H "Accept: text/event-stream"
-```
-
-## Troubleshooting
-
-**Connection Issues:**
-- Verify device is powered on and accessible
-- Check port/address permissions (Serial: user in `dialout` group)
-- Enable `debug: true` in connect parameters for verbose logging
-
-**HTTP Server Issues:**
-- Check if port is already in use: `lsof -i :8000`
-- Try a different port: `--port 8080`
-- For remote access, ensure firewall allows the port
-
-**Tool Call Failures:**
-- Ensure you're connected before calling other tools
-- Check that contact names/keys are correct
-- Verify device firmware is compatible with meshcore_py 2.2.1+
-
-**BLE Pairing:**
-- Use the `pin` parameter if your device requires pairing
-- Ensure Bluetooth is enabled on your system
-- Check that BLE address format is correct (XX:XX:XX:XX:XX:XX)
-
-**OpenWebUI/MCPO Issues:**
-- Ensure the MCP server is running and accessible at the configured URL
-- Verify MCPO can reach the MCP server (check Docker network settings)
-- Confirm the URL includes `/mcp` endpoint: `http://localhost:8000/mcp`
-- The server accepts both `/mcp` and `/mcp/` (with or without trailing slash) without redirecting
-- Check MCPO logs: `docker logs mcpo`
-- For remote servers, ensure firewall rules allow connections
-- Verify the `type` is set to `"streamable-http"` in MCPO config
-- If using older versions of MCPO (< 0.0.18), ensure it's updated to avoid trailing slash issues
-
 ## Command-Line Options
 
 ```
-usage: server.py [-h] [--host HOST] [--port PORT] [--serial-port SERIAL_PORT]
-                 [--baud-rate BAUD_RATE] [--debug]
+usage: server.py [-h] [--host HOST] [--port PORT] [--api-url API_URL]
+                 [--api-token API_TOKEN] [--verbose]
 
 MeshCore MCP Server - HTTP/Streamable transport
 
@@ -606,18 +321,17 @@ options:
   -h, --help            show this help message and exit
   --host HOST           Host to bind to (default: 0.0.0.0)
   --port PORT           Port to bind to (default: 8000)
-  --serial-port SERIAL_PORT
-                        Serial port to auto-connect on startup (e.g.,
-                        /dev/ttyUSB0). If specified, server will fail-fast if
-                        connection fails.
-  --baud-rate BAUD_RATE
-                        Baud rate for serial connection (default: 115200)
-  --debug               Enable debug mode for MeshCore connection
+  --api-url API_URL     MeshCore API URL (e.g., http://localhost:9000).
+                        Can also be set via MESHCORE_API_URL env var.
+  --api-token API_TOKEN
+                        MeshCore API bearer token for authentication.
+                        Can also be set via MESHCORE_API_TOKEN env var.
+  --verbose, -v         Enable verbose (DEBUG level) logging.
 ```
 
 ## Dependencies
 
-- [meshcore](https://pypi.org/project/meshcore/) (>=2.2.1) - Python library for MeshCore devices
+- [httpx](https://pypi.org/project/httpx/) (>=0.27.0) - Modern async HTTP client
 - [mcp](https://pypi.org/project/mcp/) (>=1.0.0) - Model Context Protocol SDK with FastMCP
 
 ## Security Considerations
@@ -640,7 +354,7 @@ Contributions welcome! Please feel free to submit issues or pull requests.
 
 ## Links
 
-- [MeshCore Python Library](https://github.com/meshcore-dev/meshcore_py)
+- [MeshCore API](https://github.com/ipnet-mesh/meshcore-api)
 - [Model Context Protocol](https://modelcontextprotocol.io/)
 - [FastMCP Documentation](https://github.com/modelcontextprotocol/python-sdk)
 - [Claude Desktop](https://claude.ai/desktop)

@@ -21,25 +21,26 @@ This file contains all the necessary guidelines for AI coding assistants, includ
 
 **Recommended - Docker:**
 ```bash
-# Basic
-docker run -d -p 8000:8000 ghcr.io/ipnet-mesh/meshcore-mcp:main
-
-# With serial device
-docker run -d -p 8000:8000 --device=/dev/ttyUSB0 \
-  ghcr.io/ipnet-mesh/meshcore-mcp:main \
-  --serial-port /dev/ttyUSB0 --sync-clock-on-startup
+# Basic usage with API configuration
+docker run -d -p 8000:8000 \
+  -e MESHCORE_API_URL=http://your-meshcore-api:9000 \
+  -e MESHCORE_API_TOKEN=your-api-token \
+  ghcr.io/ipnet-mesh/meshcore-mcp:main
 ```
 
 **Local development:**
 ```bash
 source .venv/bin/activate  # After creating venv
-python -m meshcore_mcp.server
+python -m meshcore_mcp.server --api-url http://localhost:9000
 ```
 
 ### Key Files
 
 - **User Docs**: `README.md` - Start here for Docker setup
 - **Agent Docs**: `AGENTS.md` - Development workflow
+- **API Spec**: `specs/openapi.json` - MeshCore API specification
 - **Main Code**: `src/meshcore_mcp/server.py`
+- **API Client**: `src/meshcore_mcp/client.py`
+- **Tools**: `src/meshcore_mcp/tools/`
 - **Docker**: `Dockerfile`
 - **Dependencies**: `pyproject.toml`

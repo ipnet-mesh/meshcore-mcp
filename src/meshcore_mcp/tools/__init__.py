@@ -1,10 +1,7 @@
-"""MCP tools for MeshCore device control."""
+"""MCP tools for MeshCore API."""
 
 # Tools are registered in their respective modules
-# Import all tool modules to ensure registration
-from . import connect
 from . import messages
-from . import device
-from . import time
+from . import advertisements
 
-__all__ = ['connect', 'messages', 'device', 'time']
+__all__ = ['messages', 'advertisements']
