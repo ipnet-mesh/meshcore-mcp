@@ -1,0 +1,3314 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "MeshCore API",
+        "description": "\n# MeshCore API\n\nThis API provides access to MeshCore network events and allows sending commands to the mesh network.\n\n## Features\n\n- **Query Events**: Retrieve messages, advertisements, telemetry, and other network events\n- **Node Management**: List and search nodes by public key (full 64 hex characters or prefix)\n- **Send Commands**: Send messages, pings, trace paths, and telemetry requests\n- **Health Monitoring**: Check system and MeshCore connection status\n- **Metrics**: Prometheus metrics endpoint for observability\n- **Node Tags**: Manage custom metadata for nodes (friendly names, locations, etc.)\n\n## Public Key Requirements\n\nMost endpoints require **full 64-character hexadecimal public keys**:\n- All write operations (tags, commands) require full 64-char keys\n- Query endpoints (messages, advertisements, telemetry, tags) require full 64-char keys\n- Use `GET /api/v1/nodes/{prefix}` to resolve partial keys to full keys first\n\n**Workflow:**\n1. Search by prefix: `GET /api/v1/nodes/abc123` (returns all matching nodes)\n2. Use full key for operations: `GET /api/v1/nodes/{full-64-char-key}/messages`\n\n## Authentication\n\nThis API supports optional Bearer token authentication:\n- **When configured**: All endpoints require an `Authorization: Bearer <token>` header\n- **When not configured**: API is public and no authentication is required\n- **Excluded endpoints**: `/docs`, `/redoc`, `/openapi.json`, and `/metrics` are always public\n\nTo configure authentication, set the `MESHCORE_API_BEARER_TOKEN` environment variable or use the `--api-bearer-token` CLI argument.\n\nExample authenticated request:\n```bash\ncurl -H \"Authorization: Bearer your-secret-token\" http://localhost:8000/api/v1/health\n```\n\n## Rate Limiting\n\nNo rate limiting is currently enforced.\n\n## Data Retention\n\nData is automatically cleaned up based on the configured retention period (default: 30 days).\n        ",
+        "contact": {
+            "name": "MeshCore API",
+            "url": "https://github.com/ipnet-mesh/meshcore-api"
+        },
+        "license": {
+            "name": "MIT"
+        },
+        "version": "1.0.0"
+    },
+    "paths": {
+        "/api/v1/health": {
+            "get": {
+                "tags": [
+                    "health"
+                ],
+                "summary": "Overall health check",
+                "description": "Check the overall health status of the application including MeshCore and database connectivity",
+                "operationId": "health_check_api_v1_health_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HealthCheckResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/health/db": {
+            "get": {
+                "tags": [
+                    "health"
+                ],
+                "summary": "Database health check",
+                "description": "Check database connectivity and get statistics about stored data",
+                "operationId": "database_health_api_v1_health_db_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DatabaseHealthResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/health/meshcore": {
+            "get": {
+                "tags": [
+                    "health"
+                ],
+                "summary": "MeshCore health check",
+                "description": "Check MeshCore connection status and get device information",
+                "operationId": "meshcore_health_api_v1_health_meshcore_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MeshCoreHealthResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/nodes/{public_key}/tags": {
+            "get": {
+                "tags": [
+                    "tags"
+                ],
+                "summary": "Get all tags for a node",
+                "description": "Get all custom metadata tags for a specific node (requires full 64-character public key)",
+                "operationId": "get_node_tags_api_v1_nodes__public_key__tags_get",
+                "parameters": [
+                    {
+                        "name": "public_key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Public Key"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 1000,
+                            "minimum": 1,
+                            "description": "Maximum number of tags to return",
+                            "default": 100,
+                            "title": "Limit"
+                        },
+                        "description": "Maximum number of tags to return"
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Number of tags to skip",
+                            "default": 0,
+                            "title": "Offset"
+                        },
+                        "description": "Number of tags to skip"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NodeTagListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/nodes/{public_key}/tags/{key}": {
+            "get": {
+                "tags": [
+                    "tags"
+                ],
+                "summary": "Get a specific tag",
+                "description": "Get the value of a specific tag for a node (requires full 64-character public key)",
+                "operationId": "get_node_tag_api_v1_nodes__public_key__tags__key__get",
+                "parameters": [
+                    {
+                        "name": "public_key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Public Key"
+                        }
+                    },
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Key"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NodeTagResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "tags"
+                ],
+                "summary": "Set or update a tag",
+                "description": "Set or update a single tag for a node (requires full 64-character public key)",
+                "operationId": "set_node_tag_api_v1_nodes__public_key__tags__key__put",
+                "parameters": [
+                    {
+                        "name": "public_key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Public Key"
+                        }
+                    },
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Key"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TagValueUpdateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NodeTagResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "tags"
+                ],
+                "summary": "Delete a tag",
+                "description": "Delete a specific tag from a node (requires full 64-character public key)",
+                "operationId": "delete_node_tag_api_v1_nodes__public_key__tags__key__delete",
+                "parameters": [
+                    {
+                        "name": "public_key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Public Key"
+                        }
+                    },
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Key"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/nodes/{public_key}/tags/bulk": {
+            "post": {
+                "tags": [
+                    "tags"
+                ],
+                "summary": "Bulk update tags",
+                "description": "Update multiple tags on a single node (requires full 64-character public key)",
+                "operationId": "bulk_update_tags_api_v1_nodes__public_key__tags_bulk_post",
+                "parameters": [
+                    {
+                        "name": "public_key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Public Key"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BulkTagUpdateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BulkTagUpdateResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/tags": {
+            "get": {
+                "tags": [
+                    "tags"
+                ],
+                "summary": "Query tags across all nodes",
+                "description": "Query tags with optional filters by key, value type, or node public key (full 64 chars)",
+                "operationId": "query_tags_api_v1_tags_get",
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Filter by tag key",
+                            "title": "Key"
+                        },
+                        "description": "Filter by tag key"
+                    },
+                    {
+                        "name": "value_type",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Filter by value type",
+                            "title": "Value Type"
+                        },
+                        "description": "Filter by value type"
+                    },
+                    {
+                        "name": "node_public_key",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string",
+                                    "minLength": 64,
+                                    "maxLength": 64
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Filter by node public key (full 64 hex characters)",
+                            "title": "Node Public Key"
+                        },
+                        "description": "Filter by node public key (full 64 hex characters)"
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 1000,
+                            "minimum": 1,
+                            "description": "Maximum number of tags to return",
+                            "default": 100,
+                            "title": "Limit"
+                        },
+                        "description": "Maximum number of tags to return"
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Number of tags to skip",
+                            "default": 0,
+                            "title": "Offset"
+                        },
+                        "description": "Number of tags to skip"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NodeTagListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/tags/keys": {
+            "get": {
+                "tags": [
+                    "tags"
+                ],
+                "summary": "List all unique tag keys",
+                "description": "Get a list of all unique tag keys in use across all nodes",
+                "operationId": "get_tag_keys_api_v1_tags_keys_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TagKeysResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/nodes/by-tag": {
+            "get": {
+                "tags": [
+                    "tags"
+                ],
+                "summary": "Query nodes by tag",
+                "description": "Get nodes that have a specific tag key/value pair",
+                "operationId": "query_nodes_by_tag_api_v1_nodes_by_tag_get",
+                "parameters": [
+                    {
+                        "name": "tag_key",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Tag key to filter by",
+                            "title": "Tag Key"
+                        },
+                        "description": "Tag key to filter by"
+                    },
+                    {
+                        "name": "tag_value",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Tag value to match (or 'EXISTS' for any value)",
+                            "title": "Tag Value"
+                        },
+                        "description": "Tag value to match (or 'EXISTS' for any value)"
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 1000,
+                            "minimum": 1,
+                            "description": "Maximum number of nodes to return",
+                            "default": 100,
+                            "title": "Limit"
+                        },
+                        "description": "Maximum number of nodes to return"
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Number of nodes to skip",
+                            "default": 0,
+                            "title": "Offset"
+                        },
+                        "description": "Number of nodes to skip"
+                    },
+                    {
+                        "name": "sort_by",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "description": "Field to sort by (last_seen, first_seen, public_key)",
+                            "default": "last_seen",
+                            "title": "Sort By"
+                        },
+                        "description": "Field to sort by (last_seen, first_seen, public_key)"
+                    },
+                    {
+                        "name": "order",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "description": "Sort order (asc, desc)",
+                            "default": "desc",
+                            "title": "Order"
+                        },
+                        "description": "Sort order (asc, desc)"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NodeListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/nodes": {
+            "get": {
+                "tags": [
+                    "nodes"
+                ],
+                "summary": "List all nodes",
+                "description": "Get a paginated list of all known nodes with optional sorting",
+                "operationId": "list_nodes_api_v1_nodes_get",
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 1000,
+                            "minimum": 1,
+                            "description": "Maximum number of nodes to return",
+                            "default": 100,
+                            "title": "Limit"
+                        },
+                        "description": "Maximum number of nodes to return"
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Number of nodes to skip",
+                            "default": 0,
+                            "title": "Offset"
+                        },
+                        "description": "Number of nodes to skip"
+                    },
+                    {
+                        "name": "sort_by",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "description": "Field to sort by (last_seen, first_seen, public_key)",
+                            "default": "last_seen",
+                            "title": "Sort By"
+                        },
+                        "description": "Field to sort by (last_seen, first_seen, public_key)"
+                    },
+                    {
+                        "name": "order",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "description": "Sort order (asc, desc)",
+                            "default": "desc",
+                            "title": "Order"
+                        },
+                        "description": "Sort order (asc, desc)"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NodeListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/nodes/{prefix}": {
+            "get": {
+                "tags": [
+                    "nodes"
+                ],
+                "summary": "Search nodes by public key prefix",
+                "description": "Find all nodes whose public key starts with the given prefix (2-64 characters)",
+                "operationId": "search_nodes_by_prefix_api_v1_nodes__prefix__get",
+                "parameters": [
+                    {
+                        "name": "prefix",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Prefix"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NodeListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/nodes/{public_key}/messages": {
+            "get": {
+                "tags": [
+                    "nodes"
+                ],
+                "summary": "Get messages for a specific node",
+                "description": "Get all messages sent to or from a specific node (requires full 64-character public key)",
+                "operationId": "get_node_messages_api_v1_nodes__public_key__messages_get",
+                "parameters": [
+                    {
+                        "name": "public_key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Public Key"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 1000,
+                            "minimum": 1,
+                            "description": "Maximum number of messages to return",
+                            "default": 100,
+                            "title": "Limit"
+                        },
+                        "description": "Maximum number of messages to return"
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Number of messages to skip",
+                            "default": 0,
+                            "title": "Offset"
+                        },
+                        "description": "Number of messages to skip"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MessageListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/nodes/{public_key}/telemetry": {
+            "get": {
+                "tags": [
+                    "nodes"
+                ],
+                "summary": "Get telemetry data for a node",
+                "description": "Get all telemetry data received from a specific node (requires full 64-character public key)",
+                "operationId": "get_node_telemetry_api_v1_nodes__public_key__telemetry_get",
+                "parameters": [
+                    {
+                        "name": "public_key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Public Key"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 1000,
+                            "minimum": 1,
+                            "description": "Maximum number of telemetry records to return",
+                            "default": 100,
+                            "title": "Limit"
+                        },
+                        "description": "Maximum number of telemetry records to return"
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Number of telemetry records to skip",
+                            "default": 0,
+                            "title": "Offset"
+                        },
+                        "description": "Number of telemetry records to skip"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TelemetryListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/messages": {
+            "get": {
+                "tags": [
+                    "messages"
+                ],
+                "summary": "Query messages",
+                "description": "Get messages with optional filters for sender public key (full 64 chars), channel, type, and sender timestamp range",
+                "operationId": "query_messages_api_v1_messages_get",
+                "parameters": [
+                    {
+                        "name": "sender_public_key",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string",
+                                    "minLength": 64,
+                                    "maxLength": 64
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Filter by sender public key (full 64 hex characters)",
+                            "title": "Sender Public Key"
+                        },
+                        "description": "Filter by sender public key (full 64 hex characters)"
+                    },
+                    {
+                        "name": "channel_idx",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Filter by channel index (channel messages)",
+                            "title": "Channel Idx"
+                        },
+                        "description": "Filter by channel index (channel messages)"
+                    },
+                    {
+                        "name": "message_type",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Filter by message type (contact/channel)",
+                            "title": "Message Type"
+                        },
+                        "description": "Filter by message type (contact/channel)"
+                    },
+                    {
+                        "name": "start_date",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string",
+                                    "format": "date-time"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Filter messages after this sender_timestamp (ISO 8601)",
+                            "title": "Start Date"
+                        },
+                        "description": "Filter messages after this sender_timestamp (ISO 8601)"
+                    },
+                    {
+                        "name": "end_date",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string",
+                                    "format": "date-time"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Filter messages before this sender_timestamp (ISO 8601)",
+                            "title": "End Date"
+                        },
+                        "description": "Filter messages before this sender_timestamp (ISO 8601)"
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 1000,
+                            "minimum": 1,
+                            "description": "Maximum number of messages to return",
+                            "default": 100,
+                            "title": "Limit"
+                        },
+                        "description": "Maximum number of messages to return"
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Number of messages to skip",
+                            "default": 0,
+                            "title": "Offset"
+                        },
+                        "description": "Number of messages to skip"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MessageListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/advertisements": {
+            "get": {
+                "tags": [
+                    "advertisements"
+                ],
+                "summary": "Query advertisements",
+                "description": "Get node advertisements with optional filters for node public key (full 64 chars), type, and date range",
+                "operationId": "query_advertisements_api_v1_advertisements_get",
+                "parameters": [
+                    {
+                        "name": "node_public_key",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string",
+                                    "minLength": 64,
+                                    "maxLength": 64
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Filter by node public key (full 64 hex characters)",
+                            "title": "Node Public Key"
+                        },
+                        "description": "Filter by node public key (full 64 hex characters)"
+                    },
+                    {
+                        "name": "adv_type",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Filter by advertisement type (none/chat/repeater/room)",
+                            "title": "Adv Type"
+                        },
+                        "description": "Filter by advertisement type (none/chat/repeater/room)"
+                    },
+                    {
+                        "name": "start_date",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string",
+                                    "format": "date-time"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Filter advertisements after this date (ISO 8601)",
+                            "title": "Start Date"
+                        },
+                        "description": "Filter advertisements after this date (ISO 8601)"
+                    },
+                    {
+                        "name": "end_date",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string",
+                                    "format": "date-time"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Filter advertisements before this date (ISO 8601)",
+                            "title": "End Date"
+                        },
+                        "description": "Filter advertisements before this date (ISO 8601)"
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 1000,
+                            "minimum": 1,
+                            "description": "Maximum number of advertisements to return",
+                            "default": 100,
+                            "title": "Limit"
+                        },
+                        "description": "Maximum number of advertisements to return"
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Number of advertisements to skip",
+                            "default": 0,
+                            "title": "Offset"
+                        },
+                        "description": "Number of advertisements to skip"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdvertisementListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/telemetry": {
+            "get": {
+                "tags": [
+                    "telemetry"
+                ],
+                "summary": "Query telemetry data",
+                "description": "Get telemetry data with optional filters for node public key (full 64 chars) and date range",
+                "operationId": "query_telemetry_api_v1_telemetry_get",
+                "parameters": [
+                    {
+                        "name": "node_public_key",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string",
+                                    "minLength": 64,
+                                    "maxLength": 64
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Filter by node public key (full 64 hex characters)",
+                            "title": "Node Public Key"
+                        },
+                        "description": "Filter by node public key (full 64 hex characters)"
+                    },
+                    {
+                        "name": "start_date",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string",
+                                    "format": "date-time"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Filter telemetry after this date (ISO 8601)",
+                            "title": "Start Date"
+                        },
+                        "description": "Filter telemetry after this date (ISO 8601)"
+                    },
+                    {
+                        "name": "end_date",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string",
+                                    "format": "date-time"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Filter telemetry before this date (ISO 8601)",
+                            "title": "End Date"
+                        },
+                        "description": "Filter telemetry before this date (ISO 8601)"
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 1000,
+                            "minimum": 1,
+                            "description": "Maximum number of telemetry records to return",
+                            "default": 100,
+                            "title": "Limit"
+                        },
+                        "description": "Maximum number of telemetry records to return"
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Number of telemetry records to skip",
+                            "default": 0,
+                            "title": "Offset"
+                        },
+                        "description": "Number of telemetry records to skip"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TelemetryListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/trace-paths": {
+            "get": {
+                "tags": [
+                    "trace-paths"
+                ],
+                "summary": "Query trace path results",
+                "description": "Get trace path results with optional filters for destination and date range",
+                "operationId": "query_trace_paths_api_v1_trace_paths_get",
+                "parameters": [
+                    {
+                        "name": "start_date",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string",
+                                    "format": "date-time"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Filter trace paths after this date (ISO 8601)",
+                            "title": "Start Date"
+                        },
+                        "description": "Filter trace paths after this date (ISO 8601)"
+                    },
+                    {
+                        "name": "end_date",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string",
+                                    "format": "date-time"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Filter trace paths before this date (ISO 8601)",
+                            "title": "End Date"
+                        },
+                        "description": "Filter trace paths before this date (ISO 8601)"
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 1000,
+                            "minimum": 1,
+                            "description": "Maximum number of trace paths to return",
+                            "default": 100,
+                            "title": "Limit"
+                        },
+                        "description": "Maximum number of trace paths to return"
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Number of trace paths to skip",
+                            "default": 0,
+                            "title": "Offset"
+                        },
+                        "description": "Number of trace paths to skip"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TracePathListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/signal-strength": {
+            "get": {
+                "tags": [
+                    "signal-strength"
+                ],
+                "summary": "Query signal strength measurements",
+                "description": "Get signal strength measurements between nodes with optional filters. All public keys must be full 64 hex characters.",
+                "operationId": "query_signal_strength_api_v1_signal_strength_get",
+                "parameters": [
+                    {
+                        "name": "source_public_key",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string",
+                                    "minLength": 64,
+                                    "maxLength": 64
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Filter by source node public key (full 64 hex characters)",
+                            "title": "Source Public Key"
+                        },
+                        "description": "Filter by source node public key (full 64 hex characters)"
+                    },
+                    {
+                        "name": "destination_public_key",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string",
+                                    "minLength": 64,
+                                    "maxLength": 64
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Filter by destination node public key (full 64 hex characters)",
+                            "title": "Destination Public Key"
+                        },
+                        "description": "Filter by destination node public key (full 64 hex characters)"
+                    },
+                    {
+                        "name": "start_date",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string",
+                                    "format": "date-time"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Filter signal strength records after this date (ISO 8601)",
+                            "title": "Start Date"
+                        },
+                        "description": "Filter signal strength records after this date (ISO 8601)"
+                    },
+                    {
+                        "name": "end_date",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string",
+                                    "format": "date-time"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Filter signal strength records before this date (ISO 8601)",
+                            "title": "End Date"
+                        },
+                        "description": "Filter signal strength records before this date (ISO 8601)"
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 1000,
+                            "minimum": 1,
+                            "description": "Maximum number of records to return",
+                            "default": 100,
+                            "title": "Limit"
+                        },
+                        "description": "Maximum number of records to return"
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Number of records to skip",
+                            "default": 0,
+                            "title": "Offset"
+                        },
+                        "description": "Number of records to skip"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SignalStrengthListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/commands/send_message": {
+            "post": {
+                "tags": [
+                    "commands"
+                ],
+                "summary": "Send a direct message",
+                "description": "Send a direct message to a specific node by public key",
+                "operationId": "send_message_api_v1_commands_send_message_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SendMessageRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SendMessageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/commands/send_channel_message": {
+            "post": {
+                "tags": [
+                    "commands"
+                ],
+                "summary": "Send a channel message",
+                "description": "Broadcast a message to all nodes on the channel",
+                "operationId": "send_channel_message_api_v1_commands_send_channel_message_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SendChannelMessageRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SendChannelMessageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/commands/send_advert": {
+            "post": {
+                "tags": [
+                    "commands"
+                ],
+                "summary": "Send an advertisement",
+                "description": "Broadcast an advertisement to announce this device on the network",
+                "operationId": "send_advert_api_v1_commands_send_advert_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SendAdvertRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SendAdvertResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/commands/send_trace_path": {
+            "post": {
+                "tags": [
+                    "commands"
+                ],
+                "summary": "Initiate a trace path",
+                "description": "Initiate a trace path request to discover the route to a destination node",
+                "operationId": "send_trace_path_api_v1_commands_send_trace_path_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SendTracePathRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SendTracePathResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/commands/ping": {
+            "post": {
+                "tags": [
+                    "commands"
+                ],
+                "summary": "Ping a node",
+                "description": "Send a ping request to check connectivity to a specific node",
+                "operationId": "ping_node_api_v1_commands_ping_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PingRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PingResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/commands/send_telemetry_request": {
+            "post": {
+                "tags": [
+                    "commands"
+                ],
+                "summary": "Request telemetry from a node",
+                "description": "Send a request to a node to return its telemetry data (sensors, battery, etc.)",
+                "operationId": "send_telemetry_request_api_v1_commands_send_telemetry_request_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SendTelemetryRequestRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SendTelemetryRequestResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/metrics": {
+            "get": {
+                "summary": "Metrics",
+                "description": "Endpoint that serves Prometheus metrics.",
+                "operationId": "metrics_metrics_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "AdvertisementListResponse": {
+                "properties": {
+                    "advertisements": {
+                        "items": {
+                            "$ref": "#/components/schemas/AdvertisementResponse"
+                        },
+                        "type": "array",
+                        "title": "Advertisements"
+                    },
+                    "total": {
+                        "type": "integer",
+                        "title": "Total"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "title": "Limit"
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "title": "Offset"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "advertisements",
+                    "total",
+                    "limit",
+                    "offset"
+                ],
+                "title": "AdvertisementListResponse",
+                "description": "Response model for advertisement list."
+            },
+            "AdvertisementResponse": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "title": "Id"
+                    },
+                    "public_key": {
+                        "type": "string",
+                        "title": "Public Key"
+                    },
+                    "adv_type": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Adv Type"
+                    },
+                    "name": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Name"
+                    },
+                    "flags": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Flags"
+                    },
+                    "received_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Received At"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "public_key",
+                    "received_at"
+                ],
+                "title": "AdvertisementResponse",
+                "description": "Response model for an advertisement."
+            },
+            "BulkTagUpdateRequest": {
+                "properties": {
+                    "tags": {
+                        "items": {
+                            "$ref": "#/components/schemas/TagValueRequest"
+                        },
+                        "type": "array",
+                        "maxItems": 50,
+                        "minItems": 1,
+                        "title": "Tags",
+                        "description": "Tags to set/update"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "tags"
+                ],
+                "title": "BulkTagUpdateRequest",
+                "description": "Request to update multiple tags on a single node."
+            },
+            "BulkTagUpdateResponse": {
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "title": "Success"
+                    },
+                    "message": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "updated_count": {
+                        "type": "integer",
+                        "title": "Updated Count"
+                    },
+                    "tags": {
+                        "items": {
+                            "$ref": "#/components/schemas/NodeTagResponse"
+                        },
+                        "type": "array",
+                        "title": "Tags"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "success",
+                    "message",
+                    "updated_count",
+                    "tags"
+                ],
+                "title": "BulkTagUpdateResponse",
+                "description": "Response from bulk tag update."
+            },
+            "CoordinateValue": {
+                "properties": {
+                    "latitude": {
+                        "type": "number",
+                        "maximum": 90.0,
+                        "minimum": -90.0,
+                        "title": "Latitude",
+                        "description": "Latitude (-90 to 90)"
+                    },
+                    "longitude": {
+                        "type": "number",
+                        "maximum": 180.0,
+                        "minimum": -180.0,
+                        "title": "Longitude",
+                        "description": "Longitude (-180 to 180)"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "latitude",
+                    "longitude"
+                ],
+                "title": "CoordinateValue",
+                "description": "Coordinate value with validation."
+            },
+            "DatabaseHealthResponse": {
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "title": "Status",
+                        "description": "Database status (healthy/unhealthy)"
+                    },
+                    "connected": {
+                        "type": "boolean",
+                        "title": "Connected"
+                    },
+                    "database_size_bytes": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Database Size Bytes"
+                    },
+                    "table_counts": {
+                        "additionalProperties": true,
+                        "type": "object",
+                        "title": "Table Counts"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "status",
+                    "connected",
+                    "table_counts"
+                ],
+                "title": "DatabaseHealthResponse",
+                "description": "Response model for database health check."
+            },
+            "HTTPValidationError": {
+                "properties": {
+                    "detail": {
+                        "items": {
+                            "$ref": "#/components/schemas/ValidationError"
+                        },
+                        "type": "array",
+                        "title": "Detail"
+                    }
+                },
+                "type": "object",
+                "title": "HTTPValidationError"
+            },
+            "HealthCheckResponse": {
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "title": "Status",
+                        "description": "Overall status (healthy/unhealthy)"
+                    },
+                    "meshcore_connected": {
+                        "type": "boolean",
+                        "title": "Meshcore Connected"
+                    },
+                    "database_connected": {
+                        "type": "boolean",
+                        "title": "Database Connected"
+                    },
+                    "uptime_seconds": {
+                        "type": "number",
+                        "title": "Uptime Seconds"
+                    },
+                    "events_processed": {
+                        "type": "integer",
+                        "title": "Events Processed"
+                    },
+                    "queue": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/QueueStatsSchema"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Command queue statistics"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "status",
+                    "meshcore_connected",
+                    "database_connected",
+                    "uptime_seconds",
+                    "events_processed"
+                ],
+                "title": "HealthCheckResponse",
+                "description": "Response model for overall health check."
+            },
+            "MeshCoreHealthResponse": {
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "title": "Status",
+                        "description": "MeshCore status (connected/disconnected)"
+                    },
+                    "connected": {
+                        "type": "boolean",
+                        "title": "Connected"
+                    },
+                    "mode": {
+                        "type": "string",
+                        "title": "Mode",
+                        "description": "Connection mode (real/mock)"
+                    },
+                    "device_info": {
+                        "anyOf": [
+                            {
+                                "additionalProperties": true,
+                                "type": "object"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Device Info"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "status",
+                    "connected",
+                    "mode"
+                ],
+                "title": "MeshCoreHealthResponse",
+                "description": "Response model for MeshCore health check."
+            },
+            "MessageListResponse": {
+                "properties": {
+                    "messages": {
+                        "items": {
+                            "$ref": "#/components/schemas/MessageResponse"
+                        },
+                        "type": "array",
+                        "title": "Messages"
+                    },
+                    "total": {
+                        "type": "integer",
+                        "title": "Total"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "title": "Limit"
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "title": "Offset"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "messages",
+                    "total",
+                    "limit",
+                    "offset"
+                ],
+                "title": "MessageListResponse",
+                "description": "Response model for message list."
+            },
+            "MessageResponse": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "title": "Id"
+                    },
+                    "direction": {
+                        "type": "string",
+                        "title": "Direction"
+                    },
+                    "message_type": {
+                        "type": "string",
+                        "title": "Message Type"
+                    },
+                    "pubkey_prefix": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Pubkey Prefix"
+                    },
+                    "channel_idx": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Channel Idx"
+                    },
+                    "txt_type": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Txt Type"
+                    },
+                    "path_len": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Path Len"
+                    },
+                    "signature": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Signature"
+                    },
+                    "content": {
+                        "type": "string",
+                        "title": "Content"
+                    },
+                    "snr": {
+                        "anyOf": [
+                            {
+                                "type": "number"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Snr"
+                    },
+                    "sender_timestamp": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Sender Timestamp"
+                    },
+                    "received_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Received At"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "direction",
+                    "message_type",
+                    "content",
+                    "received_at"
+                ],
+                "title": "MessageResponse",
+                "description": "Response model for a message."
+            },
+            "NodeListResponse": {
+                "properties": {
+                    "nodes": {
+                        "items": {
+                            "$ref": "#/components/schemas/NodeResponse"
+                        },
+                        "type": "array",
+                        "title": "Nodes"
+                    },
+                    "total": {
+                        "type": "integer",
+                        "title": "Total"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "title": "Limit"
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "title": "Offset"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "nodes",
+                    "total",
+                    "limit",
+                    "offset"
+                ],
+                "title": "NodeListResponse",
+                "description": "Response model for node list."
+            },
+            "NodeResponse": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "title": "Id"
+                    },
+                    "public_key": {
+                        "type": "string",
+                        "title": "Public Key"
+                    },
+                    "node_type": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Node Type"
+                    },
+                    "name": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Name"
+                    },
+                    "last_seen": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Last Seen"
+                    },
+                    "first_seen": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "First Seen"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Created At"
+                    },
+                    "tags": {
+                        "additionalProperties": true,
+                        "type": "object",
+                        "title": "Tags",
+                        "description": "Node tags as key-value pairs"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "public_key",
+                    "first_seen",
+                    "created_at"
+                ],
+                "title": "NodeResponse",
+                "description": "Response model for a single node."
+            },
+            "NodeTagListResponse": {
+                "properties": {
+                    "tags": {
+                        "items": {
+                            "$ref": "#/components/schemas/NodeTagResponse"
+                        },
+                        "type": "array",
+                        "title": "Tags"
+                    },
+                    "total": {
+                        "type": "integer",
+                        "title": "Total"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "title": "Limit"
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "title": "Offset"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "tags",
+                    "total",
+                    "limit",
+                    "offset"
+                ],
+                "title": "NodeTagListResponse",
+                "description": "Response model for tag list."
+            },
+            "NodeTagResponse": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "title": "Id"
+                    },
+                    "node_public_key": {
+                        "type": "string",
+                        "title": "Node Public Key"
+                    },
+                    "key": {
+                        "type": "string",
+                        "title": "Key"
+                    },
+                    "value_type": {
+                        "type": "string",
+                        "title": "Value Type"
+                    },
+                    "value": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            },
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "$ref": "#/components/schemas/CoordinateValue"
+                            }
+                        ],
+                        "title": "Value"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Created At"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Updated At"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "node_public_key",
+                    "key",
+                    "value_type",
+                    "value",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "NodeTagResponse",
+                "description": "Response model for a single tag."
+            },
+            "PingRequest": {
+                "properties": {
+                    "destination": {
+                        "type": "string",
+                        "maxLength": 64,
+                        "minLength": 64,
+                        "title": "Destination",
+                        "description": "64-character destination public key"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "destination"
+                ],
+                "title": "PingRequest",
+                "description": "Request to ping a node."
+            },
+            "PingResponse": {
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "title": "Success"
+                    },
+                    "message": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "queue_info": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/QueueInfoSchema"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Queue information"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "success",
+                    "message"
+                ],
+                "title": "PingResponse",
+                "description": "Response from pinging a node."
+            },
+            "QueueInfoSchema": {
+                "properties": {
+                    "position": {
+                        "type": "integer",
+                        "title": "Position",
+                        "description": "Position in queue"
+                    },
+                    "estimated_wait_seconds": {
+                        "type": "number",
+                        "title": "Estimated Wait Seconds",
+                        "description": "Estimated wait time in seconds"
+                    },
+                    "queue_size": {
+                        "type": "integer",
+                        "title": "Queue Size",
+                        "description": "Current queue size"
+                    },
+                    "debounced": {
+                        "type": "boolean",
+                        "title": "Debounced",
+                        "description": "Whether command was debounced"
+                    },
+                    "original_request_time": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Original Request Time",
+                        "description": "Original request time for debounced commands"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "position",
+                    "estimated_wait_seconds",
+                    "queue_size",
+                    "debounced"
+                ],
+                "title": "QueueInfoSchema",
+                "description": "Information about a command's position in the queue."
+            },
+            "QueueStatsSchema": {
+                "properties": {
+                    "queue_size": {
+                        "type": "integer",
+                        "title": "Queue Size",
+                        "description": "Current queue size"
+                    },
+                    "max_queue_size": {
+                        "type": "integer",
+                        "title": "Max Queue Size",
+                        "description": "Maximum queue size"
+                    },
+                    "rate_limit_tokens_available": {
+                        "type": "number",
+                        "title": "Rate Limit Tokens Available",
+                        "description": "Available rate limit tokens"
+                    },
+                    "debounce_cache_size": {
+                        "type": "integer",
+                        "title": "Debounce Cache Size",
+                        "description": "Debounce cache size"
+                    },
+                    "commands_processed_total": {
+                        "type": "integer",
+                        "title": "Commands Processed Total",
+                        "description": "Total commands processed"
+                    },
+                    "commands_dropped_total": {
+                        "type": "integer",
+                        "title": "Commands Dropped Total",
+                        "description": "Total commands dropped"
+                    },
+                    "commands_debounced_total": {
+                        "type": "integer",
+                        "title": "Commands Debounced Total",
+                        "description": "Total commands debounced"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "queue_size",
+                    "max_queue_size",
+                    "rate_limit_tokens_available",
+                    "debounce_cache_size",
+                    "commands_processed_total",
+                    "commands_dropped_total",
+                    "commands_debounced_total"
+                ],
+                "title": "QueueStatsSchema",
+                "description": "Queue statistics for health check."
+            },
+            "SendAdvertRequest": {
+                "properties": {
+                    "flood": {
+                        "type": "boolean",
+                        "title": "Flood",
+                        "description": "Enable flooding",
+                        "default": false
+                    }
+                },
+                "type": "object",
+                "title": "SendAdvertRequest",
+                "description": "Request to send an advertisement."
+            },
+            "SendAdvertResponse": {
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "title": "Success"
+                    },
+                    "message": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "queue_info": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/QueueInfoSchema"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Queue information"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "success",
+                    "message"
+                ],
+                "title": "SendAdvertResponse",
+                "description": "Response from sending an advertisement."
+            },
+            "SendChannelMessageRequest": {
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "maxLength": 1000,
+                        "minLength": 1,
+                        "title": "Text",
+                        "description": "Message text content"
+                    },
+                    "flood": {
+                        "type": "boolean",
+                        "title": "Flood",
+                        "description": "Enable flooding",
+                        "default": false
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "text"
+                ],
+                "title": "SendChannelMessageRequest",
+                "description": "Request to send a channel message."
+            },
+            "SendChannelMessageResponse": {
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "title": "Success"
+                    },
+                    "message": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "queue_info": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/QueueInfoSchema"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Queue information"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "success",
+                    "message"
+                ],
+                "title": "SendChannelMessageResponse",
+                "description": "Response from sending a channel message."
+            },
+            "SendMessageRequest": {
+                "properties": {
+                    "destination": {
+                        "type": "string",
+                        "maxLength": 64,
+                        "minLength": 64,
+                        "title": "Destination",
+                        "description": "64-character destination public key"
+                    },
+                    "text": {
+                        "type": "string",
+                        "maxLength": 1000,
+                        "minLength": 1,
+                        "title": "Text",
+                        "description": "Message text content"
+                    },
+                    "text_type": {
+                        "type": "string",
+                        "title": "Text Type",
+                        "description": "Text type (plain/cli_data/signed_plain)",
+                        "default": "plain"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "destination",
+                    "text"
+                ],
+                "title": "SendMessageRequest",
+                "description": "Request to send a direct message."
+            },
+            "SendMessageResponse": {
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "title": "Success"
+                    },
+                    "message": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "estimated_delivery_ms": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Estimated Delivery Ms"
+                    },
+                    "queue_info": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/QueueInfoSchema"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Queue information"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "success",
+                    "message"
+                ],
+                "title": "SendMessageResponse",
+                "description": "Response from sending a message."
+            },
+            "SendTelemetryRequestRequest": {
+                "properties": {
+                    "destination": {
+                        "type": "string",
+                        "maxLength": 64,
+                        "minLength": 64,
+                        "title": "Destination",
+                        "description": "64-character destination public key"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "destination"
+                ],
+                "title": "SendTelemetryRequestRequest",
+                "description": "Request to send a telemetry request."
+            },
+            "SendTelemetryRequestResponse": {
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "title": "Success"
+                    },
+                    "message": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "queue_info": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/QueueInfoSchema"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Queue information"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "success",
+                    "message"
+                ],
+                "title": "SendTelemetryRequestResponse",
+                "description": "Response from sending a telemetry request."
+            },
+            "SendTracePathRequest": {
+                "properties": {
+                    "destination": {
+                        "type": "string",
+                        "maxLength": 64,
+                        "minLength": 64,
+                        "title": "Destination",
+                        "description": "64-character destination public key"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "destination"
+                ],
+                "title": "SendTracePathRequest",
+                "description": "Request to initiate a trace path."
+            },
+            "SendTracePathResponse": {
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "title": "Success"
+                    },
+                    "message": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "initiator_tag": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Initiator Tag"
+                    },
+                    "queue_info": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/QueueInfoSchema"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Queue information"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "success",
+                    "message"
+                ],
+                "title": "SendTracePathResponse",
+                "description": "Response from initiating a trace path."
+            },
+            "SignalStrengthListResponse": {
+                "properties": {
+                    "signal_strengths": {
+                        "items": {
+                            "$ref": "#/components/schemas/SignalStrengthResponse"
+                        },
+                        "type": "array",
+                        "title": "Signal Strengths"
+                    },
+                    "total": {
+                        "type": "integer",
+                        "title": "Total"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "title": "Limit"
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "title": "Offset"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "signal_strengths",
+                    "total",
+                    "limit",
+                    "offset"
+                ],
+                "title": "SignalStrengthListResponse",
+                "description": "Response model for signal strength list."
+            },
+            "SignalStrengthResponse": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "title": "Id"
+                    },
+                    "source_public_key": {
+                        "type": "string",
+                        "title": "Source Public Key"
+                    },
+                    "destination_public_key": {
+                        "type": "string",
+                        "title": "Destination Public Key"
+                    },
+                    "snr": {
+                        "type": "number",
+                        "title": "Snr"
+                    },
+                    "trace_path_id": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Trace Path Id"
+                    },
+                    "recorded_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Recorded At"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "source_public_key",
+                    "destination_public_key",
+                    "snr",
+                    "recorded_at"
+                ],
+                "title": "SignalStrengthResponse",
+                "description": "Response model for a signal strength measurement."
+            },
+            "TagKeysResponse": {
+                "properties": {
+                    "keys": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Keys"
+                    },
+                    "total": {
+                        "type": "integer",
+                        "title": "Total"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "keys",
+                    "total"
+                ],
+                "title": "TagKeysResponse",
+                "description": "Response model for listing unique tag keys."
+            },
+            "TagValueRequest": {
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "maxLength": 128,
+                        "minLength": 1,
+                        "title": "Key",
+                        "description": "Tag key"
+                    },
+                    "value_type": {
+                        "type": "string",
+                        "enum": [
+                            "string",
+                            "number",
+                            "boolean",
+                            "coordinate"
+                        ],
+                        "title": "Value Type",
+                        "description": "Value type"
+                    },
+                    "value": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            },
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "$ref": "#/components/schemas/CoordinateValue"
+                            }
+                        ],
+                        "title": "Value",
+                        "description": "Tag value"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "key",
+                    "value_type",
+                    "value"
+                ],
+                "title": "TagValueRequest",
+                "description": "Tagged value for setting/updating tags (includes key for bulk operations)."
+            },
+            "TagValueUpdateRequest": {
+                "properties": {
+                    "value_type": {
+                        "type": "string",
+                        "enum": [
+                            "string",
+                            "number",
+                            "boolean",
+                            "coordinate"
+                        ],
+                        "title": "Value Type",
+                        "description": "Value type"
+                    },
+                    "value": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            },
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "$ref": "#/components/schemas/CoordinateValue"
+                            }
+                        ],
+                        "title": "Value",
+                        "description": "Tag value"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "value_type",
+                    "value"
+                ],
+                "title": "TagValueUpdateRequest",
+                "description": "Tag value for updating a single tag (key comes from URL path)."
+            },
+            "TelemetryListResponse": {
+                "properties": {
+                    "telemetry": {
+                        "items": {
+                            "$ref": "#/components/schemas/TelemetryResponse"
+                        },
+                        "type": "array",
+                        "title": "Telemetry"
+                    },
+                    "total": {
+                        "type": "integer",
+                        "title": "Total"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "title": "Limit"
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "title": "Offset"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "telemetry",
+                    "total",
+                    "limit",
+                    "offset"
+                ],
+                "title": "TelemetryListResponse",
+                "description": "Response model for telemetry list."
+            },
+            "TelemetryResponse": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "title": "Id"
+                    },
+                    "node_public_key": {
+                        "type": "string",
+                        "title": "Node Public Key"
+                    },
+                    "parsed_data": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Parsed Data"
+                    },
+                    "received_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Received At"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "node_public_key",
+                    "received_at"
+                ],
+                "title": "TelemetryResponse",
+                "description": "Response model for telemetry data."
+            },
+            "TracePathListResponse": {
+                "properties": {
+                    "trace_paths": {
+                        "items": {
+                            "$ref": "#/components/schemas/TracePathResponse"
+                        },
+                        "type": "array",
+                        "title": "Trace Paths"
+                    },
+                    "total": {
+                        "type": "integer",
+                        "title": "Total"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "title": "Limit"
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "title": "Offset"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "trace_paths",
+                    "total",
+                    "limit",
+                    "offset"
+                ],
+                "title": "TracePathListResponse",
+                "description": "Response model for trace path list."
+            },
+            "TracePathResponse": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "title": "Id"
+                    },
+                    "initiator_tag": {
+                        "type": "integer",
+                        "title": "Initiator Tag"
+                    },
+                    "path_len": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Path Len"
+                    },
+                    "flags": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Flags"
+                    },
+                    "auth": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Auth"
+                    },
+                    "path_hashes": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Path Hashes"
+                    },
+                    "snr_values": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Snr Values"
+                    },
+                    "hop_count": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Hop Count"
+                    },
+                    "completed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Completed At"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "initiator_tag",
+                    "completed_at"
+                ],
+                "title": "TracePathResponse",
+                "description": "Response model for a trace path result."
+            },
+            "ValidationError": {
+                "properties": {
+                    "loc": {
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "type": "array",
+                        "title": "Location"
+                    },
+                    "msg": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "type": {
+                        "type": "string",
+                        "title": "Error Type"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "loc",
+                    "msg",
+                    "type"
+                ],
+                "title": "ValidationError"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "health",
+            "description": "Health check endpoints for monitoring system status"
+        },
+        {
+            "name": "nodes",
+            "description": "Node management and querying"
+        },
+        {
+            "name": "messages",
+            "description": "Message history and querying"
+        },
+        {
+            "name": "advertisements",
+            "description": "Node advertisement events"
+        },
+        {
+            "name": "telemetry",
+            "description": "Telemetry data from nodes"
+        },
+        {
+            "name": "trace-paths",
+            "description": "Network trace path results"
+        },
+        {
+            "name": "signal-strength",
+            "description": "Signal strength measurements between nodes"
+        },
+        {
+            "name": "commands",
+            "description": "Send commands to the mesh network"
+        },
+        {
+            "name": "tags",
+            "description": "Custom node metadata and tags"
+        }
+    ]
+}
