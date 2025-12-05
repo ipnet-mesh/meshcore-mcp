@@ -1,5 +1,16 @@
 # MeshCore MCP Server
 
+> [!CAUTION]
+> ## 📦 This Project is Archived
+>
+> **This repository is no longer actively maintained.** All future development has moved to the new unified repository:
+>
+> ### 👉 [**MeshCore Hub**](https://github.com/ipnet-mesh/meshcore-hub)
+>
+> Please use MeshCore Hub for all new projects and contributions. This repository remains available for reference only.
+
+---
+
 An MCP (Model Context Protocol) server that provides tools for interacting with MeshCore companion radio nodes via HTTP. This enables AI assistants and web-based tools to control and communicate with mesh network devices.
 
 ## Example Usage
